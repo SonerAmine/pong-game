@@ -5,7 +5,7 @@ import sys
 import argparse
 import pygame
 from game.game_loop import GameLoop
-from game.menu import GameMenu, HostInputDialog
+from game.menu import GameMenu, HostInputDialog, OnlineSubmenu
 from network.server import GameServer
 from network.client import GameClient
 import config
@@ -66,22 +66,29 @@ def main():
             choice = menu.run()
             
             # Handle menu choice
-            if choice == 0:  # Local Multiplayer
+            if choice == 0:  # Play with Friend (Same PC)
                 game = GameLoop()
                 game.run_local()
                 
-            elif choice == 1:  # Host Game (Server)
-                server = GameServer(args.host, args.port)
-                server.run()
+            elif choice == 1:  # Play vs Robot
+                game = GameLoop()
+                game.run_vs_ai()
                 
-            elif choice == 2:  # Join Game (Client)
-                # Show IP input dialog
-                dialog = HostInputDialog(args.host)
-                host = dialog.run()
-                client = GameClient(host, args.port)
-                client.run()
+            elif choice == 2:  # Play Online Multiplayer
+                # Show submenu for Host or Join
+                submenu = OnlineSubmenu()
+                online_choice = submenu.run()
                 
-            elif choice == 3:  # Exit
+                if online_choice == 0:  # Host Game
+                    server = GameServer(args.host, args.port)
+                    server.run()
+                elif online_choice == 1:  # Join Game
+                    dialog = HostInputDialog(args.host)
+                    host = dialog.run()
+                    client = GameClient(host, args.port)
+                    client.run()
+                
+            else:  # Exit or Cancel (-1)
                 print("👋 Thanks for playing Pong Force!")
                 sys.exit(0)
     

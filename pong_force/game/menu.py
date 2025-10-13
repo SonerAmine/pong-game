@@ -17,10 +17,9 @@ class GameMenu:
         self.running = True
         self.selected_option = 0
         self.menu_options = [
-            "Local Multiplayer",
-            "Host Game (Server)",
-            "Join Game (Client)",
-            "Exit"
+            "Play with Friend (Same PC)",
+            "Play vs Robot",
+            "Play Online Multiplayer"
         ]
         
         # Colors
@@ -71,7 +70,7 @@ class GameMenu:
                     self.running = False
                 
                 elif event.key == pygame.K_ESCAPE:
-                    self.selected_option = 3  # Exit
+                    self.selected_option = -1  # Exit/Cancel
                     self.running = False
             
             elif event.type == pygame.MOUSEMOTION:
@@ -314,4 +313,122 @@ class HostInputDialog:
             center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 60)
         )
         self.screen.blit(hint_surface, hint_rect)
+
+
+class OnlineSubmenu:
+    """Submenu for online multiplayer options"""
+    
+    def __init__(self):
+        """Initialize the online submenu"""
+        self.screen = pygame.display.get_surface()
+        self.running = True
+        self.selected_option = 0
+        self.options = [
+            "Host a Game",
+            "Join a Game",
+            "Back to Menu"
+        ]
+        self.font = pygame.font.Font(None, 36)
+        self.title_font = pygame.font.Font(None, 48)
+        self.clock = pygame.time.Clock()
+        
+    def run(self):
+        """Run the submenu and return selected option"""
+        while self.running:
+            self.handle_events()
+            self.render()
+            pygame.display.flip()
+            self.clock.tick(60)
+        
+        return self.selected_option
+    
+    def handle_events(self):
+        """Handle submenu events"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.selected_option = -1
+                self.running = False
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP or event.key == pygame.K_w:
+                    self.selected_option = (self.selected_option - 1) % len(self.options)
+                
+                elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                    self.selected_option = (self.selected_option + 1) % len(self.options)
+                
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    if self.selected_option == 2:  # Back to Menu
+                        self.selected_option = -1
+                    self.running = False
+                
+                elif event.key == pygame.K_ESCAPE:
+                    self.selected_option = -1
+                    self.running = False
+            
+            elif event.type == pygame.MOUSEMOTION:
+                mouse_x, mouse_y = event.pos
+                for i, option in enumerate(self.options):
+                    option_y = config.WINDOW_HEIGHT // 2 + i * 60
+                    option_rect = pygame.Rect(
+                        config.WINDOW_WIDTH // 2 - 200,
+                        option_y - 20,
+                        400,
+                        40
+                    )
+                    if option_rect.collidepoint(mouse_x, mouse_y):
+                        self.selected_option = i
+            
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    mouse_x, mouse_y = event.pos
+                    for i, option in enumerate(self.options):
+                        option_y = config.WINDOW_HEIGHT // 2 + i * 60
+                        option_rect = pygame.Rect(
+                            config.WINDOW_WIDTH // 2 - 200,
+                            option_y - 20,
+                            400,
+                            40
+                        )
+                        if option_rect.collidepoint(mouse_x, mouse_y):
+                            self.selected_option = i
+                            if self.selected_option == 2:  # Back to Menu
+                                self.selected_option = -1
+                            self.running = False
+    
+    def render(self):
+        """Render the submenu"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        overlay.set_alpha(230)
+        overlay.fill(config.BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Draw title
+        title_text = "Online Multiplayer"
+        title_surface = self.title_font.render(title_text, True, config.NEON_BLUE)
+        title_rect = title_surface.get_rect(
+            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 100)
+        )
+        self.screen.blit(title_surface, title_rect)
+        
+        # Draw options
+        for i, option in enumerate(self.options):
+            if i == self.selected_option:
+                color = config.NEON_PINK
+                # Draw selection indicator
+                indicator_y = config.WINDOW_HEIGHT // 2 + i * 60
+                pygame.draw.circle(
+                    self.screen,
+                    config.NEON_PINK,
+                    (config.WINDOW_WIDTH // 2 - 120, indicator_y),
+                    5
+                )
+            else:
+                color = config.WHITE
+            
+            option_surface = self.font.render(option, True, color)
+            option_rect = option_surface.get_rect(
+                center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + i * 60)
+            )
+            self.screen.blit(option_surface, option_rect)
 

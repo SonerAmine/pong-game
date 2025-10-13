@@ -11,14 +11,25 @@ from .effects import EffectsManager
 import config
 
 class GameLoop:
-    def __init__(self):
-        """Initialize the game loop"""
+    def __init__(self, fullscreen=False):
+        """Initialize the game loop
+        
+        Args:
+            fullscreen (bool): Start in fullscreen mode
+        """
         # Initialize Pygame
         pygame.init()
         pygame.mixer.init()
         
+        # Screen settings
+        self.fullscreen = fullscreen
+        self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
+        
         # Create screen
-        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        if self.fullscreen:
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
         pygame.display.set_caption(config.TITLE)
         
         # Game clock
@@ -64,10 +75,21 @@ class GameLoop:
         self.is_client = False
         self.network_connected = False
         
+        # AI state
+        self.ai_enabled = False
+        self.ai_difficulty = 0.85  # 0.0 to 1.0 (higher = smarter AI)
+        
     def run_local(self):
         """Run local multiplayer game"""
         print("🎮 Starting local multiplayer game...")
         self.is_server = True
+        self.game_state = config.STATE_PLAYING
+        self.main_loop()
+    
+    def run_vs_ai(self):
+        """Run game against AI"""
+        print("🤖 Starting game vs AI...")
+        self.ai_enabled = True
         self.game_state = config.STATE_PLAYING
         self.main_loop()
     
@@ -142,6 +164,10 @@ class GameLoop:
             elif self.game_state == config.STATE_PAUSED:
                 self.game_state = config.STATE_PLAYING
         
+        elif key == pygame.K_F11 or key == pygame.K_f:
+            # Toggle fullscreen
+            self.toggle_fullscreen()
+        
         elif key == pygame.K_r:
             if self.game_state == config.STATE_GAME_OVER:
                 self.restart_game()
@@ -196,13 +222,18 @@ class GameLoop:
         else:
             self.paddle1.stop_moving()
         
-        # Player 2 controls (W/S keys)
-        if pygame.K_w in self.keys_pressed:
-            self.paddle2.move_up()
-        elif pygame.K_s in self.keys_pressed:
-            self.paddle2.move_down()
+        # Player 2 controls (W/S keys) or AI
+        if self.ai_enabled:
+            # AI controls player 2
+            self.update_ai()
         else:
-            self.paddle2.stop_moving()
+            # Human player 2 controls
+            if pygame.K_w in self.keys_pressed:
+                self.paddle2.move_up()
+            elif pygame.K_s in self.keys_pressed:
+                self.paddle2.move_down()
+            else:
+                self.paddle2.stop_moving()
     
     def update_gameplay(self, dt):
         """Update gameplay logic
@@ -400,6 +431,57 @@ class GameLoop:
         connect_surface = font.render(connect_text, True, config.WHITE)
         connect_rect = connect_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2))
         surface.blit(connect_surface, connect_rect)
+    
+    def toggle_fullscreen(self):
+        """Toggle between fullscreen and windowed mode"""
+        self.fullscreen = not self.fullscreen
+        
+        if self.fullscreen:
+            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        
+        print(f"{'🖥️ Fullscreen' if self.fullscreen else '🪟 Windowed'} mode")
+    
+    def update_ai(self):
+        """Update AI paddle movement"""
+        if not self.ai_enabled:
+            return
+        
+        # AI controls paddle 2
+        paddle_center = self.paddle2.y + self.paddle2.height // 2
+        ball_center = self.ball.y + self.ball.size // 2
+        
+        # Calculate prediction based on difficulty
+        # Higher difficulty = better prediction
+        import random
+        prediction_error = (1 - self.ai_difficulty) * 100
+        predicted_y = ball_center + random.uniform(-prediction_error, prediction_error)
+        
+        # Move paddle towards predicted position
+        threshold = 5  # Dead zone to prevent jittering
+        
+        if predicted_y < paddle_center - threshold:
+            self.paddle2.move_up()
+        elif predicted_y > paddle_center + threshold:
+            self.paddle2.move_down()
+        else:
+            self.paddle2.stop_moving()
+        
+        # AI force push logic
+        # Try to use force push when ball is close and moving towards AI paddle
+        if self.ball.vx > 0:  # Ball moving towards AI paddle (right side)
+            distance_to_ball = abs(self.paddle2.x - self.ball.x)
+            if distance_to_ball < 200 and self.paddle2.force_cooldown <= 0:
+                # Random chance based on difficulty
+                if random.random() < self.ai_difficulty * 0.3:  # 30% chance at max difficulty
+                    self.paddle2.try_force_push(self.ball)
+                    if self.paddle2.force_cooldown > 0:
+                        self.effects.create_force_effect(
+                            self.ball.x + self.ball.size // 2,
+                            self.ball.y + self.ball.size // 2,
+                            2
+                        )
     
     def cleanup(self):
         """Cleanup resources"""
