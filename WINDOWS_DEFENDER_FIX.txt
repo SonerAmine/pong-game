@@ -1,0 +1,55 @@
+# Pong Force - Installation Guide
+
+## 🛡️ Windows Defender Warning
+
+If Windows Defender shows a warning about Pong Force being a threat, this is a **false positive**. This is common with games created using PyInstaller.
+
+### Why does this happen?
+- PyInstaller packages Python applications into executables
+- Windows Defender sometimes flags these as suspicious
+- This is a known issue with many legitimate applications
+
+### How to fix it:
+
+#### Method 1: Use the installer script
+1. Run `install_pong_force.bat` as Administrator
+2. This will install the game properly and add Windows Defender exceptions
+
+#### Method 2: Manual Windows Defender exception
+1. Open Windows Security (Windows Defender)
+2. Go to "Virus & threat protection"
+3. Click "Manage settings" under "Virus & threat protection settings"
+4. Click "Add or remove exclusions"
+5. Click "Add an exclusion" → "Folder"
+6. Add the folder where you extracted Pong Force
+
+#### Method 3: Temporary disable real-time protection
+1. Open Windows Security
+2. Go to "Virus & threat protection"
+3. Click "Manage settings" under "Virus & threat protection settings"
+4. Turn off "Real-time protection" temporarily
+5. Run Pong Force
+6. Turn "Real-time protection" back on
+
+### Is Pong Force safe?
+✅ **YES!** Pong Force is completely safe:
+- Open source code
+- No malicious functionality
+- Created with standard Python/Pygame tools
+- No network connections (except for multiplayer)
+- No data collection
+
+### Game Features:
+- 2-Player Multiplayer (Local & LAN)
+- Force Push Mechanics
+- Neon Arcade Visuals
+- Particle Effects
+- Sound System
+- Network Play
+
+### Controls:
+- **Player 1**: Arrow Keys (move), SPACE (force push)
+- **Player 2**: W/S (move), SHIFT (force push)
+- **General**: ESC (pause), R (restart)
+
+Enjoy the game! 🎮

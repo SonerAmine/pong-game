@@ -2,7 +2,8 @@
  False,
  False,
  False,
- 'C:\\Users\\PC\\AppData\\Local\\Python\\python-3.11.9-embed-amd64\\Lib\\site-packages\\PyInstaller\\bootloader\\images\\icon-windowed.ico',
+ ['C:\\Users\\PC\\Desktop\\pong '
+  'game\\pong_force\\..\\assets\\images\\icon.ico'],
  None,
  False,
  False,
@@ -340,7 +341,7 @@
  [],
  False,
  False,
- 1760315734,
+ 1760318179,
  [('runw.exe',
    'C:\\Users\\PC\\AppData\\Local\\Python\\python-3.11.9-embed-amd64\\Lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit-intel\\runw.exe',
    'EXECUTABLE')],

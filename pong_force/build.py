@@ -45,7 +45,7 @@ def clean_build():
 
 def create_icon():
     """Create a simple icon if none exists"""
-    icon_path = "assets/images/icon.ico"
+    icon_path = "../assets/images/icon.ico"
     
     if not os.path.exists(icon_path):
         print("Creating default icon...")
@@ -93,7 +93,7 @@ def build_executable():
     ]
     
     # Add icon if it exists
-    icon_path = "assets/images/icon.ico"
+    icon_path = "../assets/images/icon.ico"
     if os.path.exists(icon_path):
         cmd.extend(["--icon", icon_path])
     

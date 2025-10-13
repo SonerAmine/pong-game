@@ -1,3 +1,38 @@
+/* ===== WINDOWS DEFENDER WARNING ===== */
+.defender-warning {
+    background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+    border: 2px solid #ff4757;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px 0;
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+    animation: pulse-warning 2s infinite;
+}
+
+.defender-warning p {
+    margin: 8px 0;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.defender-warning strong {
+    color: #fff;
+    font-weight: 700;
+}
+
+@keyframes pulse-warning {
+    0% {
+        box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 25px rgba(255, 71, 87, 0.5);
+    }
+    100% {
+        box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+    }
+}
+
 /* ===== RESET & BASE STYLES ===== */
 * {
     margin: 0;
