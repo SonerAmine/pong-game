@@ -97,13 +97,21 @@ def main():
                         online_choice = submenu.run()
                         
                         if online_choice == 0:  # Host Game
-                            server = GameServer(args.host, args.port)
+                            print("🌐 Starting server...")
+                            print(f"📍 Server will listen on all interfaces (0.0.0.0):{args.port}")
+                            print("💡 Share your PUBLIC IP address with other players!")
+                            print("💡 To find your public IP, visit: https://www.whatismyip.com/")
+                            server = GameServer(config.SERVER_IP, args.port)
                             server.run()
                         elif online_choice == 1:  # Join Game
-                            dialog = HostInputDialog(args.host)
+                            dialog = HostInputDialog()
                             host = dialog.run()
-                            client = GameClient(host, args.port)
-                            client.run()
+                            if host:  # Only connect if user entered an IP
+                                print(f"🔗 Connecting to {host}:{args.port}...")
+                                client = GameClient(host, args.port)
+                                client.run()
+                            else:
+                                print("❌ Connection cancelled")
                     except Exception as e:
                         print(f"❌ Error in online mode: {e}")
                         if config.DEBUG_MODE:

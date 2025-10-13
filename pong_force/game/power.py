@@ -2,6 +2,7 @@
 
 import pygame
 import math
+import random
 import config
 
 class ForcePush:
@@ -49,7 +50,7 @@ class ForcePush:
         
         for _ in range(particle_count):
             # Random direction
-            angle = math.random() * 2 * math.pi
+            angle = random.uniform(0, 2 * math.pi)
             speed = random.uniform(2, 8) * intensity
             
             particle = {

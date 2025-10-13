@@ -6,6 +6,7 @@ import json
 import time
 import sys
 import os
+import pygame
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,6 +39,9 @@ class GameClient:
         self.input_queue = []
         self.last_input_time = 0
         self.input_throttle = 1.0 / 60  # Send input 60 times per second max
+        
+        # Clock for FPS limiting
+        self.clock = pygame.time.Clock()
     
     def connect(self):
         """Connect to server"""

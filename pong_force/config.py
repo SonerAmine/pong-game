@@ -45,7 +45,7 @@ SCORE_DISPLAY_SIZE = 48
 
 # ===== NETWORKING =====
 SERVER_PORT = 5555
-SERVER_IP = "localhost"
+SERVER_IP = "0.0.0.0"  # Listen on all network interfaces (for internet play)
 BUFFER_SIZE = 1024
 NETWORK_UPDATE_RATE = 60  # Updates per second
 

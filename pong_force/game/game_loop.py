@@ -28,28 +28,18 @@ class GameLoop:
         self.fullscreen = fullscreen
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         
-        # Get existing display or create new one
-        try:
-            self.screen = pygame.display.get_surface()
-            if self.screen is None:
-                # No existing surface, create new one
-                if self.fullscreen:
-                    self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-                else:
-                    self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
-            else:
-                # Resize existing surface if needed
-                current_size = self.screen.get_size()
-                if current_size != self.windowed_size and not self.fullscreen:
-                    self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
-        except:
-            # Fallback: create new surface
+        # Always use existing display surface (menu created it)
+        # Just update the caption
+        self.screen = pygame.display.get_surface()
+        if self.screen is None:
+            # Create new surface only if none exists
             if self.fullscreen:
                 self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             else:
+                # Use RESIZABLE flag to enable window buttons (minimize, maximize, close)
                 self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
         
-        pygame.display.set_caption(config.TITLE)
+        pygame.display.set_caption(config.TITLE + " - Game")
         
         # Game clock
         self.clock = pygame.time.Clock()
@@ -97,6 +87,11 @@ class GameLoop:
         # AI state
         self.ai_enabled = False
         self.ai_difficulty = 0.85  # 0.0 to 1.0 (higher = smarter AI)
+        
+        # Score delay timer (non-blocking)
+        self.score_delay_active = False
+        self.score_delay_timer = 0
+        self.score_delay_duration = 1.5  # seconds
         
     def run_local(self):
         """Run local multiplayer game"""
@@ -161,6 +156,12 @@ class GameLoop:
             if event.type == pygame.QUIT:
                 self.running = False
             
+            elif event.type == pygame.VIDEORESIZE:
+                # Handle window resize
+                self.windowed_size = (event.w, event.h)
+                if not self.fullscreen:
+                    self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+            
             elif event.type == pygame.KEYDOWN:
                 self.keys_just_pressed.add(event.key)
                 self.keys_pressed.add(event.key)
@@ -182,6 +183,12 @@ class GameLoop:
                 self.game_state = config.STATE_PAUSED
             elif self.game_state == config.STATE_PAUSED:
                 self.game_state = config.STATE_PLAYING
+            elif self.game_state == config.STATE_GAME_OVER:
+                self.running = False  # Return to menu
+        
+        elif key == pygame.K_q:
+            # Quit to menu
+            self.running = False
         
         elif key == pygame.K_F11 or key == pygame.K_f:
             # Toggle fullscreen
@@ -192,7 +199,7 @@ class GameLoop:
                 self.restart_game()
         
         elif key == pygame.K_SPACE:
-            if self.game_state == config.STATE_PLAYING:
+            if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
                 # Player 1 force push
                 if self.paddle1.try_force_push(self.ball):
                     self.effects.create_force_effect(
@@ -202,9 +209,9 @@ class GameLoop:
                     )
         
         elif key == pygame.K_LSHIFT or key == pygame.K_RSHIFT:
-            if self.game_state == config.STATE_PLAYING:
-                # Player 2 force push
-                if self.paddle2.try_force_push(self.ball):
+            if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
+                # Player 2 force push (only if not AI)
+                if not self.ai_enabled and self.paddle2.try_force_push(self.ball):
                     self.effects.create_force_effect(
                         self.ball.x + self.ball.size // 2,
                         self.ball.y + self.ball.size // 2,
@@ -217,11 +224,20 @@ class GameLoop:
         Args:
             dt (float): Delta time in seconds
         """
+        # Update score delay timer
+        if self.score_delay_active:
+            self.score_delay_timer += dt
+            if self.score_delay_timer >= self.score_delay_duration:
+                self.score_delay_active = False
+                self.score_delay_timer = 0
+                self.ball.reset_ball()
+        
         # Update input
-        self.update_input()
+        if not self.score_delay_active:
+            self.update_input()
         
         # Update game objects
-        if self.game_state == config.STATE_PLAYING:
+        if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
             self.update_gameplay(dt)
         
         # Update effects
@@ -301,9 +317,13 @@ class GameLoop:
         self.scoreboard.add_score(player_id)
         self.effects.create_score_effect(player_id)
         
-        # Reset ball after a short delay
-        pygame.time.wait(1000)  # 1 second delay
-        self.ball.reset_ball()
+        # Start non-blocking delay
+        self.score_delay_active = True
+        self.score_delay_timer = 0
+        
+        # Stop ball movement during delay
+        self.ball.vx = 0
+        self.ball.vy = 0
     
     def restart_game(self):
         """Restart the game"""
@@ -393,32 +413,45 @@ class GameLoop:
         """
         # Semi-transparent overlay
         overlay = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
-        overlay.set_alpha(128)
+        overlay.set_alpha(200)
         overlay.fill(config.BLACK)
         surface.blit(overlay, (0, 0))
         
         # Pause text
-        font = pygame.font.Font(None, 48)
+        font = pygame.font.Font(None, 72)
         pause_text = "PAUSED"
         pause_surface = font.render(pause_text, True, config.NEON_YELLOW)
-        pause_rect = pause_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2))
+        pause_rect = pause_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 60))
         surface.blit(pause_surface, pause_rect)
         
         # Instructions
-        font_small = pygame.font.Font(None, 24)
-        instruction_text = "Press ESC to resume"
-        instruction_surface = font_small.render(instruction_text, True, config.WHITE)
-        instruction_rect = instruction_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 50))
-        surface.blit(instruction_surface, instruction_rect)
+        font_small = pygame.font.Font(None, 28)
+        instructions = [
+            "Press ESC to resume",
+            "Press Q to quit to menu",
+            "Press F11 for fullscreen"
+        ]
+        
+        y_offset = config.WINDOW_HEIGHT // 2 + 20
+        for instruction in instructions:
+            instruction_surface = font_small.render(instruction, True, config.WHITE)
+            instruction_rect = instruction_surface.get_rect(center=(config.WINDOW_WIDTH // 2, y_offset))
+            surface.blit(instruction_surface, instruction_rect)
+            y_offset += 40
     
     def draw_game_over_screen(self, surface):
-        """Draw game over screen
+        """Draw game over screen with quit option
         
         Args:
             surface (pygame.Surface): Surface to draw on
         """
-        # Game over screen is handled by scoreboard
-        pass
+        # Draw scoreboard's game over first
+        # Then add quit instruction
+        font_small = pygame.font.Font(None, 24)
+        quit_text = "Press ESC to return to menu"
+        quit_surface = font_small.render(quit_text, True, config.GRAY)
+        quit_rect = quit_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 100))
+        surface.blit(quit_surface, quit_rect)
     
     def draw_waiting_screen(self, surface):
         """Draw waiting for players screen
@@ -456,46 +489,84 @@ class GameLoop:
         self.fullscreen = not self.fullscreen
         
         if self.fullscreen:
-            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            # Get current display info for fullscreen
+            display_info = pygame.display.Info()
+            self.screen = pygame.display.set_mode((display_info.current_w, display_info.current_h), pygame.FULLSCREEN)
         else:
+            # Return to windowed mode with RESIZABLE flag
             self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
         
         print(f"{'🖥️ Fullscreen' if self.fullscreen else '🪟 Windowed'} mode")
     
     def update_ai(self):
-        """Update AI paddle movement"""
-        if not self.ai_enabled:
+        """Update AI paddle movement with improved intelligence"""
+        if not self.ai_enabled or self.score_delay_active:
             return
         
-        # AI controls paddle 2
-        paddle_center = self.paddle2.y + self.paddle2.height // 2
-        ball_center = self.ball.y + self.ball.size // 2
-        
-        # Calculate prediction based on difficulty
-        # Higher difficulty = better prediction
         import random
-        prediction_error = (1 - self.ai_difficulty) * 100
-        predicted_y = ball_center + random.uniform(-prediction_error, prediction_error)
+        import math
         
-        # Move paddle towards predicted position
-        threshold = 5  # Dead zone to prevent jittering
+        # AI controls paddle 2
+        paddle_center_y = self.paddle2.y + self.paddle2.height // 2
+        ball_center_y = self.ball.y + self.ball.size // 2
+        ball_center_x = self.ball.x + self.ball.size // 2
         
-        if predicted_y < paddle_center - threshold:
+        # Predict where the ball will be
+        if self.ball.vx > 0:  # Ball moving towards AI
+            # Calculate intersection point
+            time_to_reach = (self.paddle2.x - ball_center_x) / max(abs(self.ball.vx), 0.1)
+            predicted_y = ball_center_y + (self.ball.vy * time_to_reach)
+            
+            # Account for wall bounces
+            while predicted_y < 0 or predicted_y > config.WINDOW_HEIGHT:
+                if predicted_y < 0:
+                    predicted_y = abs(predicted_y)
+                elif predicted_y > config.WINDOW_HEIGHT:
+                    predicted_y = 2 * config.WINDOW_HEIGHT - predicted_y
+            
+            # Add difficulty-based error
+            prediction_error = (1 - self.ai_difficulty) * 50
+            target_y = predicted_y + random.uniform(-prediction_error, prediction_error)
+        else:
+            # Ball moving away - return to center
+            target_y = config.WINDOW_HEIGHT // 2
+        
+        # Move paddle towards target position
+        threshold = 10  # Dead zone to prevent jittering
+        speed_multiplier = 1.0 + (self.ai_difficulty * 0.3)  # Faster at higher difficulty
+        
+        if target_y < paddle_center_y - threshold:
             self.paddle2.move_up()
-        elif predicted_y > paddle_center + threshold:
+            # Increase speed for higher difficulty
+            if self.ai_difficulty > 0.7:
+                self.paddle2.y -= self.paddle2.speed * 0.2
+        elif target_y > paddle_center_y + threshold:
             self.paddle2.move_down()
+            # Increase speed for higher difficulty
+            if self.ai_difficulty > 0.7:
+                self.paddle2.y += self.paddle2.speed * 0.2
         else:
             self.paddle2.stop_moving()
         
-        # AI force push logic
-        # Try to use force push when ball is close and moving towards AI paddle
-        if self.ball.vx > 0:  # Ball moving towards AI paddle (right side)
+        # AI force push logic - more strategic
+        if self.ball.vx > 0:  # Ball moving towards AI paddle
             distance_to_ball = abs(self.paddle2.x - self.ball.x)
-            if distance_to_ball < 200 and self.paddle2.force_cooldown <= 0:
-                # Random chance based on difficulty
-                if random.random() < self.ai_difficulty * 0.3:  # 30% chance at max difficulty
-                    self.paddle2.try_force_push(self.ball)
-                    if self.paddle2.force_cooldown > 0:
+            
+            # Use force push when:
+            # 1. Ball is close enough
+            # 2. Ball is fast (good opportunity)
+            # 3. Force is ready
+            ball_speed = math.sqrt(self.ball.vx**2 + self.ball.vy**2)
+            
+            if (distance_to_ball < 150 and 
+                ball_speed > config.BALL_SPEED * 1.2 and 
+                self.paddle2.force_ready and
+                not self.score_delay_active):
+                
+                # Higher difficulty = more likely to use force push
+                use_force_chance = self.ai_difficulty * 0.5  # Up to 50% chance
+                if random.random() < use_force_chance:
+                    if self.paddle2.try_force_push(self.ball):
                         self.effects.create_force_effect(
                             self.ball.x + self.ball.size // 2,
                             self.ball.y + self.ball.size // 2,

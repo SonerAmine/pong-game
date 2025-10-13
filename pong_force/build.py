@@ -93,9 +93,12 @@ def build_executable():
     ]
     
     # Add icon if it exists
-    icon_path = "../assets/images/icon.ico"
-    if os.path.exists(icon_path):
-        cmd.extend(["--icon", icon_path])
+    icon_paths = ["../assets/images/icon.ico", "assets/images/icon.ico", "icon.ico"]
+    for icon_path in icon_paths:
+        if os.path.exists(icon_path):
+            cmd.extend(["--icon", icon_path])
+            print(f"   Using icon: {icon_path}")
+            break
     
     # Add version info
     cmd.extend([

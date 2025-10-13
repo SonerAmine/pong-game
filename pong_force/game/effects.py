@@ -3,6 +3,7 @@
 import pygame
 import math
 import random
+import os
 import config
 
 class EffectsManager:
@@ -58,57 +59,64 @@ class EffectsManager:
             sound_type (str): Type of sound to create
             
         Returns:
-            pygame.mixer.Sound: Generated sound
+            pygame.mixer.Sound: Generated sound or None
         """
-        # Create a simple sound using pygame's sound generation
-        # This is a placeholder - in a real implementation, you'd use more sophisticated audio generation
-        
-        if sound_type == 'hit':
-            # Short beep for paddle hit
-            duration = 0.1
-            frequency = 800
-        elif sound_type == 'score':
-            # Rising tone for scoring
-            duration = 0.3
-            frequency = 600
-        elif sound_type == 'force':
-            # Deep boom for force push
-            duration = 0.2
-            frequency = 200
-        else:
-            # Default sound
-            duration = 0.1
-            frequency = 440
-        
-        # Create a simple sine wave sound
-        sample_rate = 22050
-        frames = int(duration * sample_rate)
-        arr = []
-        
-        for i in range(frames):
+        try:
+            import numpy as np
+            
+            # Create a simple sound using numpy
+            if sound_type == 'hit':
+                # Short beep for paddle hit
+                duration = 0.1
+                frequency = 800
+            elif sound_type == 'score':
+                # Rising tone for scoring
+                duration = 0.3
+                frequency = 600
+            elif sound_type == 'force':
+                # Deep boom for force push
+                duration = 0.2
+                frequency = 200
+            else:
+                # Default sound
+                duration = 0.1
+                frequency = 440
+            
+            # Create a simple sine wave sound
+            sample_rate = 22050
+            frames = int(duration * sample_rate)
+            
+            # Generate time array
+            t = np.linspace(0, duration, frames)
+            
             if sound_type == 'score':
                 # Rising frequency for score sound
-                freq = frequency + (i / frames) * 400
+                wave = np.sin(2 * np.pi * (frequency + t * 400) * t)
             else:
-                freq = frequency
-            
-            # Generate sine wave
-            wave = int(32767 * math.sin(2 * math.pi * freq * i / sample_rate))
+                wave = np.sin(2 * np.pi * frequency * t)
             
             # Apply envelope
             if sound_type == 'force':
                 # Exponential decay for force sound
-                envelope = math.exp(-i / (frames * 0.3))
+                envelope = np.exp(-t / (duration * 0.3))
             else:
                 # Linear decay
-                envelope = 1.0 - (i / frames)
+                envelope = 1.0 - (t / duration)
             
-            wave = int(wave * envelope)
-            arr.append([wave, wave])  # Stereo
-        
-        sound_array = pygame.sndarray.make_sound(pygame.array.array('h', arr))
-        sound_array.set_volume(config.SOUND_VOLUME)
-        return sound_array
+            wave = wave * envelope
+            
+            # Convert to 16-bit PCM
+            wave = (wave * 32767).astype(np.int16)
+            
+            # Make stereo
+            stereo_wave = np.column_stack((wave, wave))
+            
+            sound = pygame.sndarray.make_sound(stereo_wave)
+            sound.set_volume(config.SOUND_VOLUME)
+            return sound
+        except:
+            # If sound generation fails, return None
+            return None
     
     def setup_background_effects(self):
         """Setup background particle effects"""
@@ -130,7 +138,7 @@ class EffectsManager:
         Args:
             sound_name (str): Name of sound to play
         """
-        if sound_name in self.sounds:
+        if sound_name in self.sounds and self.sounds[sound_name] is not None:
             try:
                 self.sounds[sound_name].play()
             except:

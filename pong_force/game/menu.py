@@ -30,16 +30,40 @@ class GameMenu:
         self.subtitle_color = config.NEON_BLUE
         
         # Fonts
-        self.title_font = pygame.font.Font(None, 72)
-        self.option_font = pygame.font.Font(None, 36)
-        self.subtitle_font = pygame.font.Font(None, 24)
+        self.title_font = pygame.font.Font(None, 96)
+        self.option_font = pygame.font.Font(None, 42)
+        self.subtitle_font = pygame.font.Font(None, 28)
         
         # Animation
         self.glow_alpha = 0
         self.glow_direction = 1
+        self.pulse_timer = 0
+        self.particle_timer = 0
+        
+        # Background particles
+        self.background_particles = []
+        self.init_particles()
+        
+        # Selection glow
+        self.selection_glow = 0
         
         # Clock
         self.clock = pygame.time.Clock()
+        
+    def init_particles(self):
+        """Initialize background particles"""
+        import random
+        for _ in range(50):
+            particle = {
+                'x': random.uniform(0, config.WINDOW_WIDTH),
+                'y': random.uniform(0, config.WINDOW_HEIGHT),
+                'vx': random.uniform(-0.5, 0.5),
+                'vy': random.uniform(-0.5, 0.5),
+                'size': random.uniform(1, 3),
+                'alpha': random.uniform(30, 100),
+                'color': random.choice([config.NEON_BLUE, config.NEON_PINK, config.NEON_YELLOW])
+            }
+            self.background_particles.append(particle)
         
     def run(self):
         """Run the menu and return selected option"""
@@ -104,6 +128,9 @@ class GameMenu:
     
     def update(self):
         """Update menu animations"""
+        import random
+        import math
+        
         # Pulse effect for title
         self.glow_alpha += self.glow_direction * 3
         if self.glow_alpha >= 255:
@@ -112,11 +139,36 @@ class GameMenu:
         elif self.glow_alpha <= 100:
             self.glow_alpha = 100
             self.glow_direction = 1
+        
+        # Pulse timer for smoother animations
+        self.pulse_timer += 0.05
+        
+        # Selection glow
+        self.selection_glow = 0.5 + 0.5 * math.sin(self.pulse_timer * 3)
+        
+        # Update background particles
+        for particle in self.background_particles:
+            particle['x'] += particle['vx']
+            particle['y'] += particle['vy']
+            
+            # Wrap around screen
+            if particle['x'] < 0:
+                particle['x'] = config.WINDOW_WIDTH
+            elif particle['x'] > config.WINDOW_WIDTH:
+                particle['x'] = 0
+            
+            if particle['y'] < 0:
+                particle['y'] = config.WINDOW_HEIGHT
+            elif particle['y'] > config.WINDOW_HEIGHT:
+                particle['y'] = 0
     
     def render(self):
         """Render the menu"""
         # Clear screen
         self.screen.fill(self.bg_color)
+        
+        # Draw background particles
+        self.draw_background_particles()
         
         # Draw title with glow effect
         self.draw_title()
@@ -130,54 +182,137 @@ class GameMenu:
         # Draw controls hint
         self.draw_controls()
     
+    def draw_background_particles(self):
+        """Draw animated background particles"""
+        for particle in self.background_particles:
+            color = particle['color']
+            alpha = int(particle['alpha'])
+            
+            # Create particle surface
+            particle_surface = pygame.Surface((particle['size'] * 2, particle['size'] * 2), pygame.SRCALPHA)
+            particle_color = (*color, alpha)
+            pygame.draw.circle(particle_surface, particle_color, 
+                             (int(particle['size']), int(particle['size'])), 
+                             int(particle['size']))
+            
+            # Blit to screen
+            self.screen.blit(particle_surface, 
+                           (int(particle['x'] - particle['size']), 
+                            int(particle['y'] - particle['size'])))
+    
     def draw_title(self):
-        """Draw the game title with glow effect"""
+        """Draw the game title with enhanced glow effect"""
         title_text = "PONG FORCE"
         
-        # Create glow effect
-        glow_surface = self.title_font.render(title_text, True, self.title_color)
-        glow_surface.set_alpha(self.glow_alpha)
+        # Create multiple glow layers for depth
+        for i in range(3, 0, -1):
+            glow_surface = self.title_font.render(title_text, True, self.title_color)
+            glow_alpha = int(self.glow_alpha * 0.3 * i)
+            glow_surface.set_alpha(glow_alpha)
+            
+            # Draw glow layers with increasing offset
+            title_rect = glow_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 120))
+            offset_mult = i * 2
+            for offset in [(offset_mult, offset_mult), (-offset_mult, -offset_mult), 
+                          (offset_mult, -offset_mult), (-offset_mult, offset_mult)]:
+                glow_rect = title_rect.copy()
+                glow_rect.x += offset[0]
+                glow_rect.y += offset[1]
+                self.screen.blit(glow_surface, glow_rect)
         
-        # Draw multiple layers for glow
-        title_rect = glow_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 100))
-        for offset in [(2, 2), (-2, -2), (2, -2), (-2, 2)]:
-            glow_rect = title_rect.copy()
-            glow_rect.x += offset[0]
-            glow_rect.y += offset[1]
-            self.screen.blit(glow_surface, glow_rect)
-        
-        # Draw main title
+        # Draw main title with bright color
         title_surface = self.title_font.render(title_text, True, self.title_color)
+        title_rect = title_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 120))
         self.screen.blit(title_surface, title_rect)
+        
+        # Draw outer glow
+        import math
+        pulse = 0.8 + 0.2 * math.sin(self.pulse_timer * 2)
+        outer_glow = pygame.Surface((title_rect.width + 40, title_rect.height + 40), pygame.SRCALPHA)
+        glow_color = (*self.title_color, int(50 * pulse))
+        pygame.draw.rect(outer_glow, glow_color, outer_glow.get_rect(), border_radius=20)
+        self.screen.blit(outer_glow, (title_rect.x - 20, title_rect.y - 20))
     
     def draw_subtitle(self):
-        """Draw subtitle"""
+        """Draw subtitle with glow"""
+        import math
         subtitle_text = "Smash. Push. Win."
+        
+        # Glow effect
+        pulse = 0.6 + 0.4 * math.sin(self.pulse_timer * 1.5)
+        glow_surface = self.subtitle_font.render(subtitle_text, True, self.subtitle_color)
+        glow_surface.set_alpha(int(150 * pulse))
+        glow_rect = glow_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 190))
+        
+        # Draw glow layers
+        for offset in [(1, 1), (-1, -1), (1, -1), (-1, 1)]:
+            glow_pos = glow_rect.copy()
+            glow_pos.x += offset[0]
+            glow_pos.y += offset[1]
+            self.screen.blit(glow_surface, glow_pos)
+        
+        # Main text
         subtitle_surface = self.subtitle_font.render(subtitle_text, True, self.subtitle_color)
-        subtitle_rect = subtitle_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 160))
+        subtitle_rect = subtitle_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 190))
         self.screen.blit(subtitle_surface, subtitle_rect)
     
     def draw_options(self):
-        """Draw menu options"""
+        """Draw menu options with enhanced effects"""
+        import math
+        
         for i, option in enumerate(self.menu_options):
-            # Choose color based on selection
+            option_y = config.WINDOW_HEIGHT // 2 + i * 80 - 20
+            
+            # Choose color and effects based on selection
             if i == self.selected_option:
                 color = self.selected_color
-                # Draw selection indicator
-                indicator_y = config.WINDOW_HEIGHT // 2 + i * 60
+                
+                # Draw glowing selection box
+                box_width = 600
+                box_height = 60
+                box_rect = pygame.Rect(
+                    config.WINDOW_WIDTH // 2 - box_width // 2,
+                    option_y - box_height // 2 + 5,
+                    box_width,
+                    box_height
+                )
+                
+                # Outer glow
+                glow_alpha = int(100 * self.selection_glow)
+                glow_surface = pygame.Surface((box_width + 20, box_height + 20), pygame.SRCALPHA)
+                glow_color = (*self.selected_color, glow_alpha)
+                pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=15)
+                self.screen.blit(glow_surface, (box_rect.x - 10, box_rect.y - 10))
+                
+                # Main box
+                pygame.draw.rect(self.screen, self.selected_color, box_rect, 3, border_radius=10)
+                
+                # Draw animated indicator
+                pulse_size = 8 + int(4 * math.sin(self.pulse_timer * 5))
+                indicator_x = config.WINDOW_WIDTH // 2 - 280
                 pygame.draw.circle(
                     self.screen,
                     self.selected_color,
-                    (config.WINDOW_WIDTH // 2 - 150, indicator_y),
-                    5
+                    (indicator_x, option_y + 5),
+                    pulse_size
                 )
+                
+                # Draw glow around text
+                glow_text = self.option_font.render(option, True, config.NEON_YELLOW)
+                glow_text.set_alpha(int(100 * self.selection_glow))
+                glow_rect = glow_text.get_rect(center=(config.WINDOW_WIDTH // 2, option_y + 5))
+                for offset in [(2, 0), (-2, 0), (0, 2), (0, -2)]:
+                    glow_pos = glow_rect.copy()
+                    glow_pos.x += offset[0]
+                    glow_pos.y += offset[1]
+                    self.screen.blit(glow_text, glow_pos)
             else:
                 color = self.normal_color
             
             # Render option text
             option_surface = self.option_font.render(option, True, color)
             option_rect = option_surface.get_rect(
-                center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + i * 60)
+                center=(config.WINDOW_WIDTH // 2, option_y + 5)
             )
             self.screen.blit(option_surface, option_rect)
     
@@ -200,7 +335,7 @@ class GameMenu:
 class HostInputDialog:
     """Dialog to get server IP address for client connection"""
     
-    def __init__(self, default_host=config.SERVER_IP):
+    def __init__(self, default_host=""):
         """Initialize the input dialog
         
         Args:
@@ -208,11 +343,12 @@ class HostInputDialog:
         """
         self.screen = pygame.display.get_surface()
         self.running = True
-        self.input_text = default_host
+        self.input_text = default_host if default_host and default_host != "0.0.0.0" else ""
         self.cursor_visible = True
         self.cursor_timer = 0
         self.font = pygame.font.Font(None, 32)
         self.title_font = pygame.font.Font(None, 48)
+        self.small_font = pygame.font.Font(None, 20)
         self.clock = pygame.time.Clock()
         
     def run(self):
@@ -224,7 +360,8 @@ class HostInputDialog:
             pygame.display.flip()
             self.clock.tick(60)
         
-        return self.input_text if self.input_text else config.SERVER_IP
+        # Return the entered IP or None if cancelled
+        return self.input_text if self.input_text else None
     
     def handle_events(self):
         """Handle input dialog events"""
@@ -306,13 +443,20 @@ class HostInputDialog:
                 2
             )
         
-        # Draw hint
-        hint_text = "Press ENTER to connect, ESC to cancel"
-        hint_surface = pygame.font.Font(None, 20).render(hint_text, True, config.GRAY)
-        hint_rect = hint_surface.get_rect(
-            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 60)
-        )
-        self.screen.blit(hint_surface, hint_rect)
+        # Draw hints
+        hints = [
+            "Enter the server's PUBLIC IP address",
+            "Example: 192.168.1.100 (local) or 123.456.789.0 (internet)",
+            "Press ENTER to connect, ESC to cancel"
+        ]
+        
+        y_pos = config.WINDOW_HEIGHT // 2 + 60
+        for i, hint in enumerate(hints):
+            hint_surface = self.small_font.render(hint, True, config.GRAY)
+            hint_rect = hint_surface.get_rect(
+                center=(config.WINDOW_WIDTH // 2, y_pos + i * 25)
+            )
+            self.screen.blit(hint_surface, hint_rect)
 
 
 class OnlineSubmenu:
