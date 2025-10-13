@@ -40,15 +40,29 @@ class GameClient:
         self.last_input_time = 0
         self.input_throttle = 1.0 / 60  # Send input 60 times per second max
         
+        # Error handling
+        self.error_message = None
+        self.error_title = None
+        
         # Clock for FPS limiting
         self.clock = pygame.time.Clock()
     
     def connect(self):
-        """Connect to server"""
+        """Connect to server with timeout and detailed error messages"""
         try:
+            print(f"🔗 Attempting to connect to {self.host}:{self.port}...")
+            
             # Create socket
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            
+            # Set connection timeout (10 seconds)
+            self.socket.settimeout(10.0)
+            
+            # Try to connect
             self.socket.connect((self.host, self.port))
+            
+            # Connection successful - remove timeout for normal operation
+            self.socket.settimeout(None)
             
             self.connected = True
             self.running = True
@@ -56,8 +70,28 @@ class GameClient:
             
             return True
             
+        except socket.timeout:
+            error_msg = f"❌ Connection timeout: Server at {self.host}:{self.port} did not respond.\nPlease check:\n- Server is running\n- IP address is correct\n- Firewall allows connection"
+            print(error_msg)
+            self.show_error_dialog("Connection Timeout", error_msg)
+            return False
+            
+        except socket.gaierror:
+            error_msg = f"❌ Invalid address: Could not resolve hostname '{self.host}'.\nPlease check that the IP address is correct."
+            print(error_msg)
+            self.show_error_dialog("Invalid Address", error_msg)
+            return False
+            
+        except ConnectionRefusedError:
+            error_msg = f"❌ Connection refused: Server at {self.host}:{self.port} refused connection.\nPlease check:\n- Server is running\n- Port {self.port} is correct\n- Firewall allows connection"
+            print(error_msg)
+            self.show_error_dialog("Connection Refused", error_msg)
+            return False
+            
         except Exception as e:
-            print(f"❌ Connection failed: {e}")
+            error_msg = f"❌ Connection failed: {str(e)}\n\nPlease verify:\n- Server is running\n- IP address and port are correct\n- Network connection is working"
+            print(error_msg)
+            self.show_error_dialog("Connection Error", error_msg)
             return False
     
     def start_game(self):
@@ -305,11 +339,22 @@ class GameClient:
         
         print("👋 Disconnected from server")
     
+    def show_error_dialog(self, title, message):
+        """Store error message for display
+        
+        Args:
+            title (str): Error title
+            message (str): Error message
+        """
+        self.error_title = title
+        self.error_message = message
+    
     def run(self):
         """Run the client (main entry point)"""
         try:
             # Connect to server
             if not self.connect():
+                # Connection failed - error dialog will be shown by main.py
                 return
             
             # Start game
@@ -318,6 +363,8 @@ class GameClient:
         except KeyboardInterrupt:
             print("\n🛑 Client interrupted by user")
         except Exception as e:
-            print(f"❌ Client error: {e}")
+            error_msg = f"❌ Client error: {str(e)}"
+            print(error_msg)
+            self.show_error_dialog("Client Error", error_msg)
         finally:
             self.disconnect()

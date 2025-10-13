@@ -6,7 +6,7 @@ import argparse
 import pygame
 import traceback
 from game.game_loop import GameLoop
-from game.menu import GameMenu, HostInputDialog, OnlineSubmenu
+from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog
 from network.server import GameServer
 from network.client import GameClient
 import config
@@ -62,54 +62,70 @@ def main():
             game.run_local()
             
         else:
-            # No arguments - show graphical menu
+            # No arguments - show graphical menu (with loop for returning to menu)
             try:
-                menu = GameMenu()
-                choice = menu.run()
-                
-                # Handle menu choice
-                if choice == 0:  # Play vs Robot
-                    try:
-                        print("🤖 Starting vs AI...")
-                        game = GameLoop()
-                        game.run_vs_ai()
-                    except Exception as e:
-                        print(f"❌ Error in AI mode: {e}")
-                        if config.DEBUG_MODE:
-                            traceback.print_exc()
-                        input("Press Enter to exit...")
+                running = True
+                while running:
+                    menu = GameMenu()
+                    choice = menu.run()
                     
-                elif choice == 1:  # Play Online Multiplayer
-                    try:
-                        # Show submenu for Host or Join
-                        submenu = OnlineSubmenu()
-                        online_choice = submenu.run()
+                    # Handle menu choice
+                    if choice == 0:  # Play vs Robot
+                        try:
+                            print("🤖 Starting vs AI...")
+                            game = GameLoop()
+                            game.run_vs_ai()
+                            # After game ends, loop will return to menu
+                        except Exception as e:
+                            print(f"❌ Error in AI mode: {e}")
+                            if config.DEBUG_MODE:
+                                traceback.print_exc()
+                            input("Press Enter to continue...")
                         
-                        if online_choice == 0:  # Host Game
-                            print("🌐 Starting server...")
-                            print(f"📍 Server will listen on all interfaces (0.0.0.0):{args.port}")
-                            print("💡 Share your PUBLIC IP address with other players!")
-                            print("💡 To find your public IP, visit: https://www.whatismyip.com/")
-                            server = GameServer(config.SERVER_IP, args.port)
-                            server.run()
-                        elif online_choice == 1:  # Join Game
-                            dialog = HostInputDialog()
-                            host = dialog.run()
-                            if host:  # Only connect if user entered an IP
-                                print(f"🔗 Connecting to {host}:{args.port}...")
-                                client = GameClient(host, args.port)
-                                client.run()
-                            else:
-                                print("❌ Connection cancelled")
-                    except Exception as e:
-                        print(f"❌ Error in online mode: {e}")
-                        if config.DEBUG_MODE:
-                            traceback.print_exc()
-                        input("Press Enter to exit...")
-                    
-                else:  # Exit or Cancel (-1)
-                    print("👋 Thanks for playing Pong Force!")
-                    
+                    elif choice == 1:  # Play Online Multiplayer
+                        try:
+                            # Show submenu for Host or Join
+                            submenu = OnlineSubmenu()
+                            online_choice = submenu.run()
+                            
+                            if online_choice == 0:  # Host Game
+                                print("🌐 Starting server...")
+                                print(f"📍 Server will listen on all interfaces (0.0.0.0):{args.port}")
+                                print("💡 Share your PUBLIC IP address with other players!")
+                                print("💡 To find your public IP, visit: https://www.whatismyip.com/")
+                                server = GameServer(config.SERVER_IP, args.port)
+                                # Use run_with_gui() to avoid creating a new window
+                                server.run_with_gui()
+                                # After server ends, return to menu
+                            elif online_choice == 1:  # Join Game
+                                dialog = HostInputDialog()
+                                host = dialog.run()
+                                if host:  # Only connect if user entered an IP
+                                    print(f"🔗 Connecting to {host}:{args.port}...")
+                                    client = GameClient(host, args.port)
+                                    client.run()
+                                    
+                                    # Check if there was a connection error
+                                    if client.error_message:
+                                        error_dialog = ErrorDialog(
+                                            client.error_title or "Connection Error",
+                                            client.error_message
+                                        )
+                                        error_dialog.run()
+                                    # After client ends, return to menu
+                                else:
+                                    print("❌ Connection cancelled")
+                            # If choice is -1 (back to menu), just continue loop
+                        except Exception as e:
+                            print(f"❌ Error in online mode: {e}")
+                            if config.DEBUG_MODE:
+                                traceback.print_exc()
+                            input("Press Enter to continue...")
+                        
+                    else:  # Exit or Cancel (-1)
+                        print("👋 Thanks for playing Pong Force!")
+                        running = False  # Exit the menu loop
+                        
             except Exception as e:
                 print(f"❌ Menu error: {e}")
                 if config.DEBUG_MODE:

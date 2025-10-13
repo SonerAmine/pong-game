@@ -84,14 +84,17 @@ class Ball:
             dt (float): Delta time in seconds
             screen_width (int): Screen width for boundary checking
             screen_height (int): Screen height for boundary checking
+        
+        Returns:
+            str or None: "score_left" or "score_right" if ball went off screen, None otherwise
         """
         current_time = pygame.time.get_ticks() / 1000.0
         
         # Update force push effect
         self.update_force_effect(current_time)
         
-        # Update movement
-        self.update_movement(dt, screen_width, screen_height)
+        # Update movement and get scoring result
+        result = self.update_movement(dt, screen_width, screen_height)
         
         # Update visual effects
         self.update_visual_effects(dt)
@@ -99,6 +102,9 @@ class Ball:
         # Update collision rectangle
         self.rect.x = self.x
         self.rect.y = self.y
+        
+        # Return scoring result
+        return result
     
     def update_force_effect(self, current_time):
         """Update force push effect"""
@@ -137,9 +143,9 @@ class Ball:
         
         # Left and right wall collision (scoring)
         if self.x <= 0:
-            return "score_right"  # Player 2 scores
+            return "score_left"   # Balle sort à gauche - Player 2 (droite) scores
         elif self.x + self.size >= screen_width:
-            return "score_left"   # Player 1 scores
+            return "score_right"  # Balle sort à droite - Player 1 (gauche) scores
         
         return None
     
@@ -212,15 +218,23 @@ class Ball:
         """
         current_time = pygame.time.get_ticks() / 1000.0
         
+        print(f"💥 BALLE - Apply Force Push de joueur {player_id}")
+        print(f"   Vitesse avant: vx={self.vx}, vy={self.vy}")
+        
         self.force_active = True
         self.force_end_time = current_time + config.FORCE_EFFECT_DURATION
         self.force_multiplier = config.FORCE_MULTIPLIER
         self.force_player = player_id
         self.target_glow = 1.0
         
-        # Increase speed dramatically
+        # Increase speed dramatically - MULTIPLIER LA VITESSE
+        old_vx = self.vx
+        old_vy = self.vy
         self.vx *= config.FORCE_MULTIPLIER
         self.vy *= config.FORCE_MULTIPLIER
+        
+        print(f"   Vitesse après: vx={self.vx}, vy={self.vy}")
+        print(f"   Multiplicateur: {config.FORCE_MULTIPLIER}")
         
         # Add strong screen shake
         self.shake_intensity = config.SCREEN_SHAKE_INTENSITY * 2

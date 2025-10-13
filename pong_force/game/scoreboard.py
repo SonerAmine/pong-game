@@ -46,18 +46,25 @@ class Scoreboard:
         if self.game_over:
             return
         
+        print(f"📈 Adding score for Player {player_id}")
+        print(f"   Before: P1={self.player1_score}, P2={self.player2_score}")
+        
         if player_id == 1:
             self.player1_score += 1
-        else:
+        elif player_id == 2:
             self.player2_score += 1
+        
+        print(f"   After: P1={self.player1_score}, P2={self.player2_score}")
         
         # Check for win condition
         if self.player1_score >= self.win_score:
             self.game_over = True
             self.winner = 1
+            print(f"🏆 Player 1 WINS! ({self.player1_score}-{self.player2_score})")
         elif self.player2_score >= self.win_score:
             self.game_over = True
             self.winner = 2
+            print(f"🏆 Player 2 WINS! ({self.player1_score}-{self.player2_score})")
         
         # Flash effect
         self.score_flash_duration = 30  # frames
@@ -84,11 +91,12 @@ class Scoreboard:
             if self.score_flash_duration <= 0:
                 self.score_flash_duration = 0
     
-    def draw(self, screen):
+    def draw(self, screen, ai_enabled=False):
         """Draw the scoreboard
         
         Args:
             screen (pygame.Surface): Screen surface to draw on
+            ai_enabled (bool): Whether AI is enabled
         """
         # Draw center line
         self.draw_center_line(screen)
@@ -101,7 +109,7 @@ class Scoreboard:
             self.draw_game_over(screen)
         
         # Draw force meters
-        self.draw_force_meters(screen)
+        self.draw_force_meters(screen, ai_enabled)
     
     def draw_center_line(self, screen):
         """Draw the center line with dots
@@ -185,11 +193,12 @@ class Scoreboard:
         restart_rect = restart_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 50))
         screen.blit(restart_surface, restart_rect)
     
-    def draw_force_meters(self, screen):
+    def draw_force_meters(self, screen, ai_enabled=False):
         """Draw force meters for both players
         
         Args:
             screen (pygame.Surface): Screen surface to draw on
+            ai_enabled (bool): Whether AI is enabled (hides P2 force meter)
         """
         meter_width = config.FORCE_METER_WIDTH
         meter_height = config.FORCE_METER_HEIGHT
@@ -201,22 +210,24 @@ class Scoreboard:
         pygame.draw.rect(screen, config.DARK_GRAY, p1_rect)
         pygame.draw.rect(screen, config.NEON_BLUE, p1_rect, 2)
         
-        # Player 2 force meter (right side)
-        p2_meter_x = config.WINDOW_WIDTH - config.UI_MARGIN - meter_width
-        p2_rect = pygame.Rect(p2_meter_x, meter_y, meter_width, meter_height)
-        pygame.draw.rect(screen, config.DARK_GRAY, p2_rect)
-        pygame.draw.rect(screen, config.NEON_PINK, p2_rect, 2)
-        
-        # Draw labels
-        p1_label = self.small_font.render("P1 Force", True, config.NEON_BLUE)
+        # Draw label with SPACE key indicator
+        p1_label = self.small_font.render("Force (SPACE)", True, config.NEON_BLUE)
         p1_label_rect = p1_label.get_rect(center=(p1_meter_x + meter_width // 2, meter_y - 20))
         screen.blit(p1_label, p1_label_rect)
         
-        p2_label = self.small_font.render("P2 Force", True, config.NEON_PINK)
-        p2_label_rect = p2_label.get_rect(center=(p2_meter_x + meter_width // 2, meter_y - 20))
-        screen.blit(p2_label, p2_label_rect)
+        # Only draw P2 force meter if NOT playing against AI
+        if not ai_enabled:
+            # Player 2 force meter (right side)
+            p2_meter_x = config.WINDOW_WIDTH - config.UI_MARGIN - meter_width
+            p2_rect = pygame.Rect(p2_meter_x, meter_y, meter_width, meter_height)
+            pygame.draw.rect(screen, config.DARK_GRAY, p2_rect)
+            pygame.draw.rect(screen, config.NEON_PINK, p2_rect, 2)
+            
+            p2_label = self.small_font.render("Force (E)", True, config.NEON_PINK)
+            p2_label_rect = p2_label.get_rect(center=(p2_meter_x + meter_width // 2, meter_y - 20))
+            screen.blit(p2_label, p2_label_rect)
     
-    def draw_force_meter_fill(self, screen, player_id, force_value, force_ready):
+    def draw_force_meter_fill(self, screen, player_id, force_value, force_ready, cooldown_time=0):
         """Draw force meter fill for a specific player
         
         Args:
@@ -224,6 +235,7 @@ class Scoreboard:
             player_id (int): Player ID (1 or 2)
             force_value (float): Force value (0.0 to 1.0)
             force_ready (bool): Whether force is ready
+            cooldown_time (float): Time remaining on cooldown (seconds)
         """
         meter_width = config.FORCE_METER_WIDTH
         meter_height = config.FORCE_METER_HEIGHT
@@ -237,8 +249,14 @@ class Scoreboard:
             color = config.NEON_PINK
         
         # Draw fill
-        if force_value > 0:
-            fill_width = int(meter_width * force_value)
+        if force_value > 0 or cooldown_time > 0:
+            # Calculate fill based on cooldown or meter value
+            if cooldown_time > 0:
+                fill_ratio = 1.0 - (cooldown_time / config.FORCE_COOLDOWN)
+            else:
+                fill_ratio = force_value
+            
+            fill_width = int(meter_width * fill_ratio)
             fill_rect = pygame.Rect(meter_x, meter_y, fill_width, meter_height)
             
             if force_ready:
@@ -247,12 +265,18 @@ class Scoreboard:
             else:
                 pygame.draw.rect(screen, color, fill_rect)
         
-        # Ready indicator
+        # Ready indicator or cooldown timer
         if force_ready:
             ready_text = "READY!"
             ready_surface = self.small_font.render(ready_text, True, config.NEON_YELLOW)
             ready_rect = ready_surface.get_rect(center=(meter_x + meter_width // 2, meter_y + meter_height + 15))
             screen.blit(ready_surface, ready_rect)
+        elif cooldown_time > 0:
+            # Show remaining cooldown time
+            cooldown_text = f"{int(cooldown_time)}s"
+            cooldown_surface = self.small_font.render(cooldown_text, True, config.GRAY)
+            cooldown_rect = cooldown_surface.get_rect(center=(meter_x + meter_width // 2, meter_y + meter_height + 15))
+            screen.blit(cooldown_surface, cooldown_rect)
     
     def draw_instructions(self, screen, game_state):
         """Draw game instructions

@@ -47,16 +47,31 @@ class GameServer:
         }
     
     def start(self):
-        """Start the server"""
+        """Start the server with improved error handling"""
         try:
             # Create socket
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.socket.bind((self.host, self.port))
+            
+            try:
+                self.socket.bind((self.host, self.port))
+            except OSError as e:
+                if e.errno == 10048:  # Port already in use on Windows
+                    print(f"❌ Port {self.port} is already in use!")
+                    print(f"💡 Close other instances of Pong Force or use a different port")
+                    input("Press Enter to exit...")
+                    return
+                else:
+                    raise
+            
             self.socket.listen(self.max_clients)
             
             self.running = True
-            print(f"✅ Server started on {self.host}:{self.port}")
+            print(f"✅ Server started successfully!")
+            print(f"📍 Listening on {self.host}:{self.port}")
+            print(f"🌐 Share your PUBLIC IP with other players")
+            print(f"💡 Find your IP at: www.whatismyip.com")
+            print(f"⏳ Waiting for {self.max_clients} player(s) to connect...")
             
             # Start game loop
             self.start_game()
@@ -64,19 +79,25 @@ class GameServer:
             # Start accepting connections
             self.accept_connections()
             
+        except KeyboardInterrupt:
+            print("\n🛑 Server interrupted by user")
+            self.stop()
         except Exception as e:
             print(f"❌ Server error: {e}")
+            import traceback
+            traceback.print_exc()
+            input("Press Enter to exit...")
             self.stop()
     
     def start_game(self):
         """Start the game loop"""
+        # Use existing pygame screen instead of creating a new one
         self.game_loop = GameLoop()
         self.game_loop.is_server = True
         self.game_loop.game_state = config.STATE_WAITING
         
-        # Start game in separate thread
-        self.game_thread = threading.Thread(target=self.run_game_loop, daemon=True)
-        self.game_thread.start()
+        # Don't start game thread yet - will be started in run_with_gui()
+        self.game_thread = None
     
     def run_game_loop(self):
         """Run the game loop (in separate thread)"""
@@ -169,13 +190,25 @@ class GameServer:
             client (ClientHandler): Client that disconnected
             data (dict): Disconnect data
         """
-        print(f"👋 Client {client.address} disconnected")
-        self.clients.remove(client)
+        print(f"👋 Player {client.player_id} ({client.address}) disconnected")
+        
+        if client in self.clients:
+            self.clients.remove(client)
         
         # Pause game if not enough players
         if len(self.clients) < self.max_clients:
             self.game_loop.game_state = config.STATE_WAITING
-            print("⏸️ Game paused - waiting for more players")
+            print(f"⏸️ Game paused - waiting for more players ({len(self.clients)}/{self.max_clients})")
+            
+            # Notify remaining clients
+            if self.clients:
+                message = {
+                    'type': 'player_disconnected',
+                    'data': {
+                        'message': f'Player {client.player_id} disconnected. Waiting for new player...'
+                    }
+                }
+                self.broadcast_message(message)
     
     def handle_input(self, client, data):
         """Handle client input
@@ -302,6 +335,102 @@ class GameServer:
             print("\n🛑 Server interrupted by user")
         finally:
             self.stop()
+    
+    def run_with_gui(self):
+        """Run the server with GUI (for menu integration)"""
+        import pygame
+        
+        try:
+            # Create socket
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            
+            try:
+                self.socket.bind((self.host, self.port))
+            except OSError as e:
+                if e.errno == 10048:  # Port already in use on Windows
+                    print(f"❌ Port {self.port} is already in use!")
+                    return False
+                else:
+                    raise
+            
+            self.socket.listen(self.max_clients)
+            self.running = True
+            
+            print(f"✅ Server started successfully!")
+            print(f"📍 Listening on {self.host}:{self.port}")
+            
+            # Start game loop
+            self.start_game()
+            
+            # Start accepting connections in background thread
+            accept_thread = threading.Thread(target=self.accept_connections_gui, daemon=True)
+            accept_thread.start()
+            
+            # Run the game loop in main thread (with GUI)
+            self.game_loop.main_loop()
+            
+            return True
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Server interrupted by user")
+            return False
+        except Exception as e:
+            print(f"❌ Server error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+        finally:
+            self.stop()
+    
+    def accept_connections_gui(self):
+        """Accept connections in background thread for GUI mode"""
+        print("⏳ Waiting for players to connect...")
+        
+        while self.running:
+            try:
+                # Set timeout so we can check self.running periodically
+                self.socket.settimeout(1.0)
+                
+                try:
+                    # Accept connection
+                    client_socket, address = self.socket.accept()
+                    print(f"🔗 Client connected from {address}")
+                    
+                    # Check if we have room for more clients
+                    if len(self.clients) >= self.max_clients:
+                        print(f"❌ Server full, rejecting connection from {address}")
+                        client_socket.close()
+                        continue
+                    
+                    # Create client handler
+                    client_handler = ClientHandler(client_socket, address, self)
+                    self.clients.append(client_handler)
+                    
+                    # Send welcome message
+                    self.handle_connect(client_handler, {})
+                    
+                    # Start client handler thread
+                    client_thread = threading.Thread(target=client_handler.run, daemon=True)
+                    client_thread.start()
+                    
+                    # Start game if we have enough players
+                    if len(self.clients) == self.max_clients:
+                        self.start_game_session()
+                        
+                        # Start game update thread now
+                        if not self.game_thread:
+                            self.game_thread = threading.Thread(target=self.run_game_loop, daemon=True)
+                            self.game_thread.start()
+                
+                except socket.timeout:
+                    # Timeout is normal, just continue
+                    continue
+                    
+            except Exception as e:
+                if self.running:
+                    print(f"❌ Connection error: {e}")
+                break
 
 class ClientHandler:
     def __init__(self, socket, address, server):

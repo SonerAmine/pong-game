@@ -86,7 +86,7 @@ class GameLoop:
         
         # AI state
         self.ai_enabled = False
-        self.ai_difficulty = 0.85  # 0.0 to 1.0 (higher = smarter AI)
+        self.ai_difficulty = 0.50  # 0.0 to 1.0 (higher = smarter AI) - Réduit à 0.50 pour être plus facile
         
         # Score delay timer (non-blocking)
         self.score_delay_active = False
@@ -187,7 +187,7 @@ class GameLoop:
                 self.running = False  # Return to menu
         
         elif key == pygame.K_q:
-            # Quit to menu
+            # Return to menu (don't quit completely)
             self.running = False
         
         elif key == pygame.K_F11 or key == pygame.K_f:
@@ -199,14 +199,21 @@ class GameLoop:
                 self.restart_game()
         
         elif key == pygame.K_SPACE:
+            print(f"🎮 TOUCHE ESPACE PRESSÉE ! game_state={self.game_state}, score_delay={self.score_delay_active}")
             if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
-                # Player 1 force push
-                if self.paddle1.try_force_push(self.ball):
+                print("   État OK - Appel de try_force_push")
+                # Player 1 force push - TOUJOURS activé
+                result = self.paddle1.try_force_push(self.ball)
+                print(f"   Résultat try_force_push: {result}")
+                if result:
                     self.effects.create_force_effect(
                         self.ball.x + self.ball.size // 2,
                         self.ball.y + self.ball.size // 2,
                         1
                     )
+                    print("   ✅ Effet visuel créé")
+            else:
+                print(f"   ❌ État pas OK pour Force Push")
         
         elif key == pygame.K_e:
             if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
@@ -246,6 +253,11 @@ class GameLoop:
         
         # Update scoreboard
         self.scoreboard.update(dt)
+        
+        # Check game over from scoreboard
+        if self.scoreboard.game_over and self.game_state == config.STATE_PLAYING:
+            self.game_state = config.STATE_GAME_OVER
+            print("🏆 Game Over!")
     
     def update_input(self):
         """Update input handling"""
@@ -283,11 +295,17 @@ class GameLoop:
         # Update ball
         result = self.ball.update(dt, config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         
-        # Handle ball collision results
+        # Handle ball scoring when it goes off screen
         if result == "score_left":
+            # Ball went off left side - Player 2 (right) scores
+            print("⚽ Ball went off LEFT side!")
             self.handle_score(2)  # Player 2 scores
+            return  # Don't continue updating this frame
         elif result == "score_right":
+            # Ball went off right side - Player 1 (left) scores
+            print("⚽ Ball went off RIGHT side!")
             self.handle_score(1)  # Player 1 scores
+            return  # Don't continue updating this frame
         
         # Check paddle collisions
         if self.ball.collide_with_paddle(self.paddle1):
@@ -303,10 +321,6 @@ class GameLoop:
                 self.ball.y + self.ball.size // 2,
                 config.NEON_PINK
             )
-        
-        # Check for game over
-        if self.scoreboard.game_over:
-            self.game_state = config.STATE_GAME_OVER
     
     def handle_score(self, player_id):
         """Handle scoring
@@ -314,8 +328,13 @@ class GameLoop:
         Args:
             player_id (int): Player who scored
         """
+        print(f"🎯 GOAL! Player {player_id} scored!")
+        
         # Add score immediately
         self.scoreboard.add_score(player_id)
+        print(f"📊 Score: {self.scoreboard.player1_score} - {self.scoreboard.player2_score}")
+        
+        # Create score effect
         self.effects.create_score_effect(player_id)
         
         # Reset ball position to center immediately
@@ -329,6 +348,12 @@ class GameLoop:
         # Stop ball movement during delay
         self.ball.vx = 0
         self.ball.vy = 0
+        
+        # Check for game over
+        if self.scoreboard.player1_score >= config.WIN_SCORE or self.scoreboard.player2_score >= config.WIN_SCORE:
+            print(f"🏆 GAME OVER! Final Score: {self.scoreboard.player1_score} - {self.scoreboard.player2_score}")
+            self.scoreboard.game_over = True
+            self.game_state = config.STATE_GAME_OVER
     
     def restart_game(self):
         """Restart the game"""
@@ -390,8 +415,16 @@ class GameLoop:
             self.ball.draw(surface)
             self.force_push.draw(surface)
         
-        # Draw UI
-        self.scoreboard.draw(surface)
+        # Draw UI (pass AI status to hide P2 force meter)
+        self.scoreboard.draw(surface, self.ai_enabled)
+        
+        # Draw force meter fills for paddles
+        if self.game_state in [config.STATE_PLAYING, config.STATE_PAUSED]:
+            self.scoreboard.draw_force_meter_fill(surface, 1, self.paddle1.force_meter, 
+                                                  self.paddle1.force_ready, self.paddle1.force_cooldown)
+            if not self.ai_enabled:  # Only draw P2 meter if not against AI
+                self.scoreboard.draw_force_meter_fill(surface, 2, self.paddle2.force_meter, 
+                                                      self.paddle2.force_ready, self.paddle2.force_cooldown)
         
         # Draw quit button (always visible during gameplay)
         if self.game_state in [config.STATE_PLAYING, config.STATE_PAUSED]:
@@ -415,7 +448,7 @@ class GameLoop:
         self.screen.blit(fps_surface, (10, 10))
     
     def draw_quit_button(self, surface):
-        """Draw quit to menu button in top-right corner"""
+        """Draw quit button in top-right corner"""
         # Button dimensions
         button_width = 120
         button_height = 35
@@ -447,7 +480,7 @@ class GameLoop:
         text_rect = text_surface.get_rect(center=button_rect.center)
         surface.blit(text_surface, text_rect)
         
-        # Handle click
+        # Handle click - return to menu instead of quitting
         mouse_buttons = pygame.mouse.get_pressed()
         if is_hover and mouse_buttons[0]:  # Left click
             self.running = False  # Return to menu
@@ -475,12 +508,14 @@ class GameLoop:
         font_small = pygame.font.Font(None, 28)
         instructions = [
             "Press ESC to resume",
-            "Press Q to quit to menu",
+            "Press Q to quit game",
             "Press F11 for fullscreen",
             "",
             "Controls:",
             "P1: Arrows + SPACE",
-            "P2: W/S + E"
+            "P2: W/S + E",
+            "",
+            f"First to {config.WIN_SCORE} wins!"
         ]
         
         y_offset = config.WINDOW_HEIGHT // 2 + 20
@@ -505,35 +540,160 @@ class GameLoop:
         surface.blit(quit_surface, quit_rect)
     
     def draw_waiting_screen(self, surface):
-        """Draw waiting for players screen
+        """Draw waiting for players screen with animation
         
         Args:
             surface (pygame.Surface): Surface to draw on
         """
-        font = pygame.font.Font(None, 36)
-        wait_text = "Waiting for players to connect..."
-        wait_surface = font.render(wait_text, True, config.WHITE)
-        wait_rect = wait_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2))
+        import math
+        
+        # Animated title
+        font = pygame.font.Font(None, 48)
+        wait_text = "Waiting for Players..."
+        
+        # Pulsing effect
+        pulse = 0.8 + 0.2 * math.sin(time.time() * 3)
+        color = (
+            int(config.NEON_BLUE[0] * pulse),
+            int(config.NEON_BLUE[1] * pulse),
+            int(config.NEON_BLUE[2] * pulse)
+        )
+        
+        wait_surface = font.render(wait_text, True, color)
+        wait_rect = wait_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 60))
         surface.blit(wait_surface, wait_rect)
+        
+        # Animated dots
+        dots_count = int((time.time() * 2) % 4)
+        dots_text = "." * dots_count
+        dots_surface = font.render(dots_text, True, color)
+        dots_rect = dots_surface.get_rect(
+            topleft=(wait_rect.right + 5, wait_rect.top)
+        )
+        surface.blit(dots_surface, dots_rect)
+        
+        # Server info box
+        font_medium = pygame.font.Font(None, 28)
+        font_small = pygame.font.Font(None, 24)
+        
+        info_lines = [
+            "🌐 Server Information:",
+            f"Port: {config.SERVER_PORT}",
+            "",
+            "📋 Instructions:",
+            "1. Share your PUBLIC IP with other players",
+            "2. Find your IP at: www.whatismyip.com",
+            "3. Other player should select 'Join Game'",
+            "   and enter your IP address",
+            "",
+            "⏳ Waiting for opponent to connect..."
+        ]
+        
+        y_offset = config.WINDOW_HEIGHT // 2 + 20
+        for i, line in enumerate(info_lines):
+            if i == 0 or i == 3:  # Headers
+                text_surface = font_medium.render(line, True, config.NEON_YELLOW)
+            else:
+                text_surface = font_small.render(line, True, config.WHITE)
+            
+            text_rect = text_surface.get_rect(center=(config.WINDOW_WIDTH // 2, y_offset))
+            surface.blit(text_surface, text_rect)
+            y_offset += 30 if i == 0 or i == 3 else 25
+        
+        # Press ESC to cancel hint
+        hint_surface = font_small.render("Press ESC or Q to return to menu", True, config.GRAY)
+        hint_rect = hint_surface.get_rect(
+            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - 30)
+        )
+        surface.blit(hint_surface, hint_rect)
+    
+    def draw_connecting_screen(self, surface):
+        """Draw connecting screen with animation
+        
+        Args:
+            surface (pygame.Surface): Surface to draw on
+        """
+        import math
+        
+        # Animated title
+        font = pygame.font.Font(None, 48)
+        connect_text = "Connecting to Server"
+        
+        # Pulsing effect
+        pulse = 0.7 + 0.3 * math.sin(time.time() * 4)
+        color = (
+            int(config.NEON_PINK[0] * pulse),
+            int(config.NEON_PINK[1] * pulse),
+            int(config.NEON_PINK[2] * pulse)
+        )
+        
+        connect_surface = font.render(connect_text, True, color)
+        connect_rect = connect_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 80))
+        surface.blit(connect_surface, connect_rect)
+        
+        # Animated loading dots
+        dots_count = int((time.time() * 3) % 4)
+        dots_text = "." * dots_count
+        dots_surface = font.render(dots_text, True, color)
+        dots_rect = dots_surface.get_rect(
+            topleft=(connect_rect.right + 5, connect_rect.top)
+        )
+        surface.blit(dots_surface, dots_rect)
+        
+        # Spinner animation
+        spinner_radius = 40
+        spinner_thickness = 6
+        spinner_center = (config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 20)
+        
+        # Draw spinner circle
+        num_segments = 12
+        for i in range(num_segments):
+            angle = (time.time() * 5 + i * (360 / num_segments)) % 360
+            angle_rad = math.radians(angle)
+            
+            # Calculate segment position
+            x = spinner_center[0] + math.cos(angle_rad) * spinner_radius
+            y = spinner_center[1] + math.sin(angle_rad) * spinner_radius
+            
+            # Fade segments based on position
+            alpha = int(255 * (1 - i / num_segments))
+            segment_color = (
+                int(config.NEON_BLUE[0] * alpha / 255),
+                int(config.NEON_BLUE[1] * alpha / 255),
+                int(config.NEON_BLUE[2] * alpha / 255)
+            )
+            
+            pygame.draw.circle(surface, segment_color, (int(x), int(y)), spinner_thickness)
         
         # Connection info
         font_small = pygame.font.Font(None, 24)
-        info_text = f"Server running on port {config.SERVER_PORT}"
-        info_surface = font_small.render(info_text, True, config.GRAY)
-        info_rect = info_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 50))
-        surface.blit(info_surface, info_rect)
-    
-    def draw_connecting_screen(self, surface):
-        """Draw connecting screen
         
-        Args:
-            surface (pygame.Surface): Surface to draw on
-        """
-        font = pygame.font.Font(None, 36)
-        connect_text = "Connecting to server..."
-        connect_surface = font.render(connect_text, True, config.WHITE)
-        connect_rect = connect_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2))
-        surface.blit(connect_surface, connect_rect)
+        info_lines = [
+            "Please wait while establishing connection...",
+            "",
+            "This may take up to 10 seconds",
+            "",
+            "If connection fails, please check:",
+            "• Server is running",
+            "• IP address is correct",
+            "• Port is correct (default: 5555)",
+            "• Firewall allows connection"
+        ]
+        
+        y_offset = config.WINDOW_HEIGHT // 2 + 100
+        for line in info_lines:
+            if line:
+                text_surface = font_small.render(line, True, config.WHITE)
+                text_rect = text_surface.get_rect(center=(config.WINDOW_WIDTH // 2, y_offset))
+                surface.blit(text_surface, text_rect)
+            y_offset += 25
+        
+        # Cancel hint
+        hint_surface = font_small.render("Press ESC to cancel", True, config.GRAY)
+        hint_rect = hint_surface.get_rect(
+            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - 30)
+        )
+        surface.blit(hint_surface, hint_rect)
     
     def toggle_fullscreen(self):
         """Toggle between fullscreen and windowed mode"""
@@ -575,54 +735,31 @@ class GameLoop:
                 elif predicted_y > config.WINDOW_HEIGHT:
                     predicted_y = 2 * config.WINDOW_HEIGHT - predicted_y
             
-            # Add difficulty-based error
-            prediction_error = (1 - self.ai_difficulty) * 50
+            # Add difficulty-based error (augmenté pour rendre l'IA plus facile)
+            prediction_error = (1 - self.ai_difficulty) * 120  # Augmenté de 50 à 120
             target_y = predicted_y + random.uniform(-prediction_error, prediction_error)
         else:
             # Ball moving away - return to center
             target_y = config.WINDOW_HEIGHT // 2
         
         # Move paddle towards target position
-        threshold = 10  # Dead zone to prevent jittering
-        speed_multiplier = 1.0 + (self.ai_difficulty * 0.3)  # Faster at higher difficulty
+        threshold = 30  # Dead zone augmentée (était 10) pour que l'IA soit moins réactive
+        speed_multiplier = 0.6  # Réduire la vitesse de l'IA
         
         if target_y < paddle_center_y - threshold:
             self.paddle2.move_up()
-            # Increase speed for higher difficulty
-            if self.ai_difficulty > 0.7:
-                self.paddle2.y -= self.paddle2.speed * 0.2
+            # Ralentir l'IA
+            self.paddle2.y -= self.paddle2.speed * 0.05  # Très ralenti
         elif target_y > paddle_center_y + threshold:
             self.paddle2.move_down()
-            # Increase speed for higher difficulty
-            if self.ai_difficulty > 0.7:
-                self.paddle2.y += self.paddle2.speed * 0.2
+            # Ralentir l'IA
+            self.paddle2.y += self.paddle2.speed * 0.05  # Très ralenti
         else:
             self.paddle2.stop_moving()
         
-        # AI force push logic - strategic but not automatic
-        if self.ball.vx > 0:  # Ball moving towards AI paddle
-            distance_to_ball = abs(self.paddle2.x - self.ball.x)
-            
-            # Use force push ONLY when:
-            # 1. Ball is very close and fast
-            # 2. Force is ready
-            # 3. Random chance (not every time)
-            ball_speed = math.sqrt(self.ball.vx**2 + self.ball.vy**2)
-            
-            if (distance_to_ball < 100 and 
-                ball_speed > config.BALL_SPEED * 1.5 and 
-                self.paddle2.force_ready and
-                not self.score_delay_active):
-                
-                # Reduce chance significantly - AI shouldn't spam Force Push
-                use_force_chance = self.ai_difficulty * 0.15  # Max 15% chance (was 50%)
-                if random.random() < use_force_chance:
-                    if self.paddle2.try_force_push(self.ball):
-                        self.effects.create_force_effect(
-                            self.ball.x + self.ball.size // 2,
-                            self.ball.y + self.ball.size // 2,
-                            2
-                        )
+        # AI NE PEUT PAS utiliser la Force Push - désactivé complètement pour rendre le jeu plus facile
+        # Le robot joue sans Force Push
+        pass
     
     def cleanup(self):
         """Cleanup resources"""

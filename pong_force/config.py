@@ -18,17 +18,19 @@ GRAY = (128, 128, 128)        # Secondary text
 DARK_GRAY = (64, 64, 64)      # Borders
 
 # ===== GAME PHYSICS =====
-PADDLE_SPEED = 8
-BALL_SPEED = 6
-BALL_SPEED_INCREASE = 0.1     # Speed increase per hit
-MAX_BALL_SPEED = 15
+PADDLE_SPEED = 24              # Vitesse x3 (était 8)
+BALL_SPEED = 18                # Vitesse x3 (était 6)
+BALL_SPEED_INCREASE = 0.3      # Speed increase per hit (augmenté)
+MAX_BALL_SPEED = 45            # Max speed x3 (était 15)
 
 # ===== FORCE PUSH SYSTEM =====
-FORCE_MULTIPLIER = 2.5        # Speed multiplier when force push is used
-FORCE_COOLDOWN = 10           # Seconds between force pushes
+FORCE_MULTIPLIER = 2.0        # Speed multiplier when force push is used (x2)
+FORCE_COOLDOWN = 30           # Seconds between force pushes (30 secondes)
 FORCE_METER_FILL_RATE = 1.0   # How fast the meter fills (per second)
 FORCE_STUN_DURATION = 0.5     # Seconds of stun if force push fails
 FORCE_EFFECT_DURATION = 1.0   # How long the force effect lasts
+FORCE_DASH_DISTANCE = 80      # Distance the paddle moves when using force
+FORCE_DASH_DURATION = 0.3     # Duration of the dash movement
 
 # ===== PADDLE SETTINGS =====
 PADDLE_WIDTH = 15
@@ -122,7 +124,7 @@ MEMORY_CLEANUP_INTERVAL = 300   # frames
 
 # ===== GAME BALANCE =====
 # Force push timing window (how close to ball you need to be)
-FORCE_HIT_RANGE = 30
+FORCE_HIT_RANGE = 300  # Augmenté pour permettre d'utiliser la Force plus facilement
 # Ball speed reduction over time
 BALL_SPEED_DECAY = 0.99
 # Minimum ball speed

@@ -458,6 +458,160 @@ class HostInputDialog:
             self.screen.blit(hint_surface, hint_rect)
 
 
+class ErrorDialog:
+    """Dialog to display error messages"""
+    
+    def __init__(self, title, message):
+        """Initialize the error dialog
+        
+        Args:
+            title (str): Error title
+            message (str): Error message
+        """
+        self.screen = pygame.display.get_surface()
+        self.title = title
+        self.message = message
+        self.running = True
+        self.font = pygame.font.Font(None, 32)
+        self.title_font = pygame.font.Font(None, 48)
+        self.small_font = pygame.font.Font(None, 24)
+        self.clock = pygame.time.Clock()
+        
+    def run(self):
+        """Run the error dialog"""
+        while self.running:
+            self.handle_events()
+            self.render()
+            pygame.display.flip()
+            self.clock.tick(60)
+    
+    def handle_events(self):
+        """Handle error dialog events"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key in [pygame.K_RETURN, pygame.K_SPACE, pygame.K_ESCAPE]:
+                    self.running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # Check if OK button was clicked
+                button_rect = pygame.Rect(
+                    config.WINDOW_WIDTH // 2 - 60,
+                    config.WINDOW_HEIGHT // 2 + 180,
+                    120,
+                    40
+                )
+                if button_rect.collidepoint(event.pos):
+                    self.running = False
+    
+    def render(self):
+        """Render the error dialog"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        overlay.set_alpha(220)
+        overlay.fill(config.BLACK)
+        self.screen.blit(overlay, (0, 0))
+        
+        # Draw dialog box
+        dialog_width = 700
+        dialog_height = 400
+        dialog_rect = pygame.Rect(
+            config.WINDOW_WIDTH // 2 - dialog_width // 2,
+            config.WINDOW_HEIGHT // 2 - dialog_height // 2,
+            dialog_width,
+            dialog_height
+        )
+        pygame.draw.rect(self.screen, config.DARK_GRAY, dialog_rect, border_radius=10)
+        pygame.draw.rect(self.screen, config.NEON_PINK, dialog_rect, 3, border_radius=10)
+        
+        # Draw error icon (X symbol)
+        icon_center_x = config.WINDOW_WIDTH // 2
+        icon_center_y = config.WINDOW_HEIGHT // 2 - 140
+        icon_size = 30
+        pygame.draw.line(
+            self.screen, config.NEON_PINK,
+            (icon_center_x - icon_size, icon_center_y - icon_size),
+            (icon_center_x + icon_size, icon_center_y + icon_size),
+            5
+        )
+        pygame.draw.line(
+            self.screen, config.NEON_PINK,
+            (icon_center_x + icon_size, icon_center_y - icon_size),
+            (icon_center_x - icon_size, icon_center_y + icon_size),
+            5
+        )
+        
+        # Draw title
+        title_surface = self.title_font.render(self.title, True, config.NEON_PINK)
+        title_rect = title_surface.get_rect(
+            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 90)
+        )
+        self.screen.blit(title_surface, title_rect)
+        
+        # Draw message (multi-line support)
+        message_lines = self.message.split('\n')
+        y_offset = config.WINDOW_HEIGHT // 2 - 40
+        max_width = dialog_width - 40
+        
+        for line in message_lines:
+            # Wrap long lines
+            words = line.split(' ')
+            current_line = ""
+            
+            for word in words:
+                test_line = current_line + word + " "
+                test_surface = self.small_font.render(test_line, True, config.WHITE)
+                
+                if test_surface.get_width() > max_width and current_line:
+                    # Render current line and start new one
+                    line_surface = self.small_font.render(current_line, True, config.WHITE)
+                    line_rect = line_surface.get_rect(
+                        center=(config.WINDOW_WIDTH // 2, y_offset)
+                    )
+                    self.screen.blit(line_surface, line_rect)
+                    y_offset += 25
+                    current_line = word + " "
+                else:
+                    current_line = test_line
+            
+            # Render remaining text
+            if current_line:
+                line_surface = self.small_font.render(current_line, True, config.WHITE)
+                line_rect = line_surface.get_rect(
+                    center=(config.WINDOW_WIDTH // 2, y_offset)
+                )
+                self.screen.blit(line_surface, line_rect)
+                y_offset += 30
+        
+        # Draw OK button
+        button_rect = pygame.Rect(
+            config.WINDOW_WIDTH // 2 - 60,
+            config.WINDOW_HEIGHT // 2 + 180,
+            120,
+            40
+        )
+        
+        # Check hover
+        mouse_pos = pygame.mouse.get_pos()
+        is_hover = button_rect.collidepoint(mouse_pos)
+        
+        button_color = config.NEON_BLUE if is_hover else config.DARK_GRAY
+        pygame.draw.rect(self.screen, button_color, button_rect, border_radius=5)
+        pygame.draw.rect(self.screen, config.WHITE, button_rect, 2, border_radius=5)
+        
+        # Draw button text
+        button_text = self.font.render("OK", True, config.WHITE)
+        button_text_rect = button_text.get_rect(center=button_rect.center)
+        self.screen.blit(button_text, button_text_rect)
+        
+        # Draw hint
+        hint_surface = self.small_font.render("Press ENTER or click OK to continue", True, config.GRAY)
+        hint_rect = hint_surface.get_rect(
+            center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 + 240)
+        )
+        self.screen.blit(hint_surface, hint_rect)
+
+
 class OnlineSubmenu:
     """Submenu for online multiplayer options"""
     
