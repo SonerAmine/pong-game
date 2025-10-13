@@ -4,6 +4,7 @@
 import sys
 import argparse
 import pygame
+import traceback
 from game.game_loop import GameLoop
 from game.menu import GameMenu, HostInputDialog, OnlineSubmenu
 from network.server import GameServer
@@ -22,7 +23,11 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize Pygame
+    # Set debug mode
+    if args.debug:
+        config.DEBUG_MODE = True
+    
+    # Initialize Pygame ONCE
     pygame.init()
     pygame.mixer.init(
         frequency=config.AUDIO_FREQUENCY,
@@ -30,10 +35,6 @@ def main():
         channels=config.AUDIO_CHANNELS,
         buffer=config.AUDIO_BUFFER
     )
-    
-    # Set debug mode
-    if args.debug:
-        config.DEBUG_MODE = True
     
     try:
         if args.server:
@@ -62,35 +63,61 @@ def main():
             
         else:
             # No arguments - show graphical menu
-            menu = GameMenu()
-            choice = menu.run()
-            
-            # Handle menu choice
-            if choice == 0:  # Play with Friend (Same PC)
-                game = GameLoop()
-                game.run_local()
+            try:
+                menu = GameMenu()
+                choice = menu.run()
                 
-            elif choice == 1:  # Play vs Robot
-                game = GameLoop()
-                game.run_vs_ai()
-                
-            elif choice == 2:  # Play Online Multiplayer
-                # Show submenu for Host or Join
-                submenu = OnlineSubmenu()
-                online_choice = submenu.run()
-                
-                if online_choice == 0:  # Host Game
-                    server = GameServer(args.host, args.port)
-                    server.run()
-                elif online_choice == 1:  # Join Game
-                    dialog = HostInputDialog(args.host)
-                    host = dialog.run()
-                    client = GameClient(host, args.port)
-                    client.run()
-                
-            else:  # Exit or Cancel (-1)
-                print("👋 Thanks for playing Pong Force!")
-                sys.exit(0)
+                # Handle menu choice
+                if choice == 0:  # Play with Friend (Same PC)
+                    try:
+                        print("🎮 Starting local multiplayer...")
+                        game = GameLoop()
+                        game.run_local()
+                    except Exception as e:
+                        print(f"❌ Error in local multiplayer: {e}")
+                        if config.DEBUG_MODE:
+                            traceback.print_exc()
+                        input("Press Enter to exit...")
+                    
+                elif choice == 1:  # Play vs Robot
+                    try:
+                        print("🤖 Starting vs AI...")
+                        game = GameLoop()
+                        game.run_vs_ai()
+                    except Exception as e:
+                        print(f"❌ Error in AI mode: {e}")
+                        if config.DEBUG_MODE:
+                            traceback.print_exc()
+                        input("Press Enter to exit...")
+                    
+                elif choice == 2:  # Play Online Multiplayer
+                    try:
+                        # Show submenu for Host or Join
+                        submenu = OnlineSubmenu()
+                        online_choice = submenu.run()
+                        
+                        if online_choice == 0:  # Host Game
+                            server = GameServer(args.host, args.port)
+                            server.run()
+                        elif online_choice == 1:  # Join Game
+                            dialog = HostInputDialog(args.host)
+                            host = dialog.run()
+                            client = GameClient(host, args.port)
+                            client.run()
+                    except Exception as e:
+                        print(f"❌ Error in online mode: {e}")
+                        if config.DEBUG_MODE:
+                            traceback.print_exc()
+                        input("Press Enter to exit...")
+                    
+                else:  # Exit or Cancel (-1)
+                    print("👋 Thanks for playing Pong Force!")
+                    
+            except Exception as e:
+                print(f"❌ Menu error: {e}")
+                if config.DEBUG_MODE:
+                    traceback.print_exc()
+                input("Press Enter to exit...")
     
     except KeyboardInterrupt:
         print("\n👋 Thanks for playing Pong Force!")

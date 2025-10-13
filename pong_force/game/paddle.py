@@ -25,6 +25,7 @@ class Paddle:
         # Force push system
         self.force_meter = 0.0  # 0.0 to 1.0
         self.force_ready = False
+        self.force_cooldown = 0  # Cooldown timer in seconds
         self.last_force_time = 0
         self.stunned = False
         self.stun_end_time = 0
@@ -99,8 +100,14 @@ class Paddle:
         """Update force push meter"""
         current_time = pygame.time.get_ticks() / 1000.0
         
+        # Update cooldown
+        if self.force_cooldown > 0:
+            self.force_cooldown -= dt
+            if self.force_cooldown <= 0:
+                self.force_cooldown = 0
+        
         # Fill meter over time
-        if not self.force_ready:
+        if not self.force_ready and self.force_cooldown <= 0:
             self.force_meter += config.FORCE_METER_FILL_RATE * dt
             if self.force_meter >= 1.0:
                 self.force_meter = 1.0
@@ -108,8 +115,9 @@ class Paddle:
                 self.target_glow = 1.0
         
         # Check if enough time has passed since last force push
-        if current_time - self.last_force_time >= config.FORCE_COOLDOWN:
-            if not self.force_ready:
+        time_since_last = current_time - self.last_force_time
+        if time_since_last >= config.FORCE_COOLDOWN:
+            if not self.force_ready and self.force_cooldown <= 0:
                 self.force_ready = True
                 self.target_glow = 1.0
     
@@ -180,6 +188,7 @@ class Paddle:
         # Reset force meter
         self.force_meter = 0.0
         self.force_ready = False
+        self.force_cooldown = config.FORCE_COOLDOWN
         self.target_glow = 0.0
         self.last_force_time = current_time
         

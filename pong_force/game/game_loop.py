@@ -17,19 +17,38 @@ class GameLoop:
         Args:
             fullscreen (bool): Start in fullscreen mode
         """
-        # Initialize Pygame
-        pygame.init()
-        pygame.mixer.init()
+        # Pygame should already be initialized by main.py
+        # Just ensure it's initialized
+        if not pygame.get_init():
+            pygame.init()
+        if not pygame.mixer.get_init():
+            pygame.mixer.init()
         
         # Screen settings
         self.fullscreen = fullscreen
         self.windowed_size = (config.WINDOW_WIDTH, config.WINDOW_HEIGHT)
         
-        # Create screen
-        if self.fullscreen:
-            self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-        else:
-            self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        # Get existing display or create new one
+        try:
+            self.screen = pygame.display.get_surface()
+            if self.screen is None:
+                # No existing surface, create new one
+                if self.fullscreen:
+                    self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                else:
+                    self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+            else:
+                # Resize existing surface if needed
+                current_size = self.screen.get_size()
+                if current_size != self.windowed_size and not self.fullscreen:
+                    self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        except:
+            # Fallback: create new surface
+            if self.fullscreen:
+                self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            else:
+                self.screen = pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+        
         pygame.display.set_caption(config.TITLE)
         
         # Game clock
