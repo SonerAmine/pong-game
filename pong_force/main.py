@@ -5,6 +5,7 @@ import sys
 import argparse
 import pygame
 from game.game_loop import GameLoop
+from game.menu import GameMenu, HostInputDialog
 from network.server import GameServer
 from network.client import GameClient
 import config
@@ -17,6 +18,7 @@ def main():
     parser.add_argument('--host', default=config.SERVER_IP, help='Server IP address')
     parser.add_argument('--port', type=int, default=config.SERVER_PORT, help='Server port')
     parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+    parser.add_argument('--local', action='store_true', help='Start local multiplayer directly')
     
     args = parser.parse_args()
     
@@ -35,6 +37,7 @@ def main():
     
     try:
         if args.server:
+            # Server mode with console output
             print("🎮 Starting Pong Force Server...")
             print(f"📍 Server running on {args.host}:{args.port}")
             print("⏳ Waiting for players to connect...")
@@ -44,65 +47,43 @@ def main():
             server.run()
             
         elif args.client:
+            # Client mode
             print("🎮 Starting Pong Force Client...")
             print(f"🔗 Connecting to {args.host}:{args.port}")
             
             client = GameClient(args.host, args.port)
             client.run()
             
-        else:
-            # No arguments - show menu
-            print("🎮 Pong Force - Revolutionary Pong with Force Push")
-            print("=" * 50)
-            print("Choose game mode:")
-            print("1. Host Game (Server)")
-            print("2. Join Game (Client)")
-            print("3. Local Multiplayer")
-            print("4. Exit")
-            print("=" * 50)
+        elif args.local:
+            # Direct local multiplayer (no menu)
+            print("🎮 Starting local multiplayer game...")
+            game = GameLoop()
+            game.run_local()
             
-            while True:
-                try:
-                    choice = input("Enter your choice (1-4): ").strip()
-                    
-                    if choice == "1":
-                        print(f"🎮 Starting server on {args.host}:{args.port}")
-                        server = GameServer(args.host, args.port)
-                        server.run()
-                        break
-                        
-                    elif choice == "2":
-                        host = input(f"Enter server IP (default: {args.host}): ").strip()
-                        if not host:
-                            host = args.host
-                        print(f"🔗 Connecting to {host}:{args.port}")
-                        client = GameClient(host, args.port)
-                        client.run()
-                        break
-                        
-                    elif choice == "3":
-                        print("🎮 Starting local multiplayer game...")
-                        game = GameLoop()
-                        game.run_local()
-                        break
-                        
-                    elif choice == "4":
-                        print("👋 Thanks for playing Pong Force!")
-                        sys.exit(0)
-                        
-                    else:
-                        print("❌ Invalid choice. Please enter 1, 2, 3, or 4.")
-                        
-                except KeyboardInterrupt:
-                    print("\n👋 Thanks for playing Pong Force!")
-                    sys.exit(0)
-                except Exception as e:
-                    print(f"❌ Error: {e}")
-                    if config.AUTO_RESTART_ON_ERROR:
-                        print("🔄 Restarting...")
-                        continue
-                    else:
-                        sys.exit(1)
+        else:
+            # No arguments - show graphical menu
+            menu = GameMenu()
+            choice = menu.run()
+            
+            # Handle menu choice
+            if choice == 0:  # Local Multiplayer
+                game = GameLoop()
+                game.run_local()
+                
+            elif choice == 1:  # Host Game (Server)
+                server = GameServer(args.host, args.port)
+                server.run()
+                
+            elif choice == 2:  # Join Game (Client)
+                # Show IP input dialog
+                dialog = HostInputDialog(args.host)
+                host = dialog.run()
+                client = GameClient(host, args.port)
+                client.run()
+                
+            elif choice == 3:  # Exit
+                print("👋 Thanks for playing Pong Force!")
+                sys.exit(0)
     
     except KeyboardInterrupt:
         print("\n👋 Thanks for playing Pong Force!")
