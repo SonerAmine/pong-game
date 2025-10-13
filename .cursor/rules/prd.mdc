@@ -1,0 +1,219 @@
+---
+alwaysApply: true
+---
+# 🧾 PRODUCT REQUIREMENT DOCUMENT (PRD)
+## Project Title
+**Pong Force – Official Website**
+
+---
+
+## 1️⃣ Overview
+
+**Goal:**  
+Create an **interactive promotional website** for *Pong Force*, a 2-player action Pong game with a *Force Push* mechanic.  
+The site should **attract players**, **demonstrate gameplay**, and **provide a download link** for the `.exe` version of the game.
+
+**Objectives:**
+- Impress visitors visually — energetic, glowing, arcade-style design.  
+- Provide a short **game demo (browser mini-version)** to let users “feel” the gameplay.  
+- Offer a **Download Now** button linked to the uploaded `.exe` file.  
+- Present core game details (Force Push, scoring, multiplayer).  
+- Be fully responsive (desktop + mobile).  
+- Optimize for speed and easy hosting (GitHub Pages, Vercel, etc).
+
+---
+
+## 2️⃣ Core Features
+
+| Feature | Description |
+|----------|--------------|
+| 🎮 **Game Demo** | A simplified version of Pong Force (HTML5 Canvas or Pygame Web Export) that lets users move paddles and test the Force Push.  |
+| 📦 **Download Button** | Prominent CTA to download the `.exe` version of the game (link to `/assets/PongForceSetup.exe`). |
+| 💫 **Hero Section** | Animated title “PONG FORCE” with glowing effects and background particles. Includes short tagline: *“Smash. Push. Win.”* |
+| 🔥 **Force Push Showcase** | Section explaining the Force Push mechanic with animated visual or GIF. |
+| 🧩 **Feature Highlights** | 3 cards describing the main gameplay: *Real-time Multiplayer*, *Force Push Power*, *Retro Style Fun*. |
+| 📸 **Screenshots / Trailer Section** | Carousel or grid of game images and a 30-second embedded gameplay video. |
+| 🕹️ **Try Demo Button** | Opens a modal with the playable demo in a small canvas. |
+| 📥 **Download Now Button** | Styled neon button linking directly to the `.exe` game installer. |
+| 👣 **Footer** | Contains © copyright, social links, and contact email. |
+
+---
+
+## 3️⃣ Site Map / Structure
+
+```
+pong-force-website/
+│
+├── index.html                # Main entry: homepage
+├── demo.html                 # Page for in-browser game demo
+│
+├── /assets/
+│   ├── PongForceSetup.exe    # Downloadable game file
+│   ├── images/
+│   │   ├── screenshot1.png
+│   │   ├── screenshot2.png
+│   │   └── logo.png
+│   ├── videos/
+│   │   └── trailer.mp4
+│   └── sounds/
+│       └── click.wav
+│
+├── /css/
+│   ├── style.css             # Main theme (neon, glowing effects)
+│   └── responsive.css        # Responsive adjustments
+│
+├── /js/
+│   ├── main.js               # Animations, scroll effects, event handling
+│   ├── demo.js               # Browser Pong demo logic (Canvas)
+│   └── particles.js          # Particle animation for background
+│
+├── /fonts/
+│   └── arcade.ttf            # Retro game font
+│
+└── README.md                 # Developer notes + deployment instructions
+```
+
+---
+
+## 4️⃣ Design Guidelines
+
+### 🎨 **Style**
+- **Theme:** Futuristic arcade (neon glow + dark background)
+- **Color Palette:**
+  - Background: `#0B0C10`
+  - Neon Blue: `#00FFFF`
+  - Neon Pink: `#FF00CC`
+  - White Text: `#FFFFFF`
+  - Accent Yellow (for buttons): `#FFD700`
+
+### 🖼️ **Layout**
+- Hero section = fullscreen with title, tagline, and Download button.  
+- Mid-section = Force Push showcase with animated effect.  
+- Demo section = embedded HTML5 canvas in a glowing frame.  
+- Footer = dark, minimal, neon hover effects.
+
+### 💡 **Animations**
+- Use `GSAP` or `Framer Motion` for smooth glow pulses and text fades.  
+- Parallax effect for background grid or particles (via `particles.js`).  
+- Button hover → glow intensifies.
+
+---
+
+## 5️⃣ Game Demo Specifications
+
+**Purpose:** Show a **simplified Pong Force** to entice players to download.
+
+| Feature | Description |
+|----------|--------------|
+| 🎮 Controls | Arrow keys (Player 1) & W/S (Player 2) |
+| 🧠 Force Push | Press *Space* or *Shift* to boost ball speed for 1 second |
+| 🔄 Score | Basic counter on top |
+| ⚡ Visuals | Neon ball trail, paddle glow |
+| 🔈 Sound | Optional click or “boost” sound on push |
+| ⏱️ Session | Demo lasts 30–45 seconds max (loop or restart) |
+
+**Implementation:**  
+Use pure JavaScript with `<canvas>` or embed a lightweight game engine like *Phaser.js*.  
+
+Files:  
+`demo.html` + `js/demo.js` + `css/style.css`
+
+---
+
+## 6️⃣ Interactivity & Animations
+
+- Scroll-triggered animations for each section (`IntersectionObserver` or `AOS.js`).  
+- Button clicks play sound (`click.wav`).  
+- Hover on the “Download” button causes pulse glow.  
+- Particles background (floating neon dots).  
+- “Try Demo” button opens modal with game `<canvas>` embedded.
+
+---
+
+## 7️⃣ Technical Stack
+
+| Layer | Technology |
+|-------|-------------|
+| Frontend | HTML5, CSS3, JavaScript (no framework) |
+| Animations | GSAP / AOS.js / particles.js |
+| Game Demo | Phaser.js or native Canvas API |
+| Hosting | GitHub Pages / Vercel / Netlify |
+| Download File | Stored in `/assets/PongForceSetup.exe` |
+| Fonts | Local (`/fonts/arcade.ttf`) |
+| Media | Optimized images/videos in `/assets` |
+
+---
+
+## 8️⃣ User Flow
+
+1. **Landing Page Loads** → Animated “Pong Force” title & glowing tagline.  
+2. Scroll → See Force Push mechanic showcase.  
+3. Click “Try Demo” → Opens browser mini-game modal.  
+4. Play short demo → Score or quit.  
+5. Click “Download Now” → `.exe` download starts immediately.  
+6. Footer → Social links and credits.
+
+---
+
+## 9️⃣ File Responsibilities (for Cursor AI “project rules”)
+
+| File | Responsibility |
+|------|----------------|
+| `index.html` | Home page layout and all key sections (Hero, Features, Download). |
+| `demo.html` | Contains `<canvas>` and scripts for playable demo. |
+| `style.css` | Handles all visual styles, glow effects, typography. |
+| `responsive.css` | Mobile and tablet adjustments. |
+| `main.js` | Controls animations, navigation, and button events. |
+| `demo.js` | Implements the mini Pong gameplay logic. |
+| `particles.js` | Generates animated background particles. |
+| `config.json` *(optional)* | Site metadata: version, author, download link. |
+| `/assets/` | Contains `.exe`, images, sounds, videos. |
+| `README.md` | Developer instructions for setup & deployment. |
+
+---
+
+## 🔟 Future Enhancements
+
+- Online leaderboard integration (top demo scores).  
+- Newsletter or Discord invite.  
+- Embedded trailer YouTube player.  
+- Localization (multi-language).  
+- Analytics (Google Analytics / Plausible).
+
+---
+
+## ✅ Acceptance Criteria
+
+| ID | Requirement | Status |
+|----|--------------|--------|
+| 1 | Website loads in under 3 seconds | ✔ |
+| 2 | Download button correctly downloads `.exe` | ✔ |
+| 3 | Demo playable in browser | ✔ |
+| 4 | Site fully responsive | ✔ |
+| 5 | Design visually matches “arcade neon” style | ✔ |
+| 6 | No console errors or broken links | ✔ |
+| 7 | Hosted and accessible publicly | ✔ |
+
+---
+
+## 📤 Deployment
+
+**Steps:**
+1. Place final `.exe` in `/assets/`.  
+2. Test download link locally.  
+3. Deploy entire folder to:
+   - GitHub Pages: push to `main` → enable Pages.
+   - Vercel: `vercel deploy`.
+4. Verify download link and demo functionality post-deployment.
+
+---
+
+## 🧭 Summary
+
+This PRD ensures your *Pong Force* website is:
+- Visually stunning (neon arcade design)  
+- Interactive (live demo + animations)  
+- Convincing (showcases Force Push mechanic)  
+- Functional (easy download and responsive layout)
+
+When visitors open it, they’ll immediately **see motion, play the demo, and feel the urge to download** — exactly what you want.
