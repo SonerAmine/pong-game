@@ -103,7 +103,8 @@ def main():
                                 if host:  # Only connect if user entered an IP
                                     print(f"🔗 Connecting to {host}:{args.port}...")
                                     client = GameClient(host, args.port)
-                                    client.run()
+                                    # Use run_with_gui() to avoid creating a new window
+                                    client.run_with_gui()
                                     
                                     # Check if there was a connection error
                                     if client.error_message:

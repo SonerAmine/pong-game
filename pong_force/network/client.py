@@ -368,3 +368,40 @@ class GameClient:
             self.show_error_dialog("Client Error", error_msg)
         finally:
             self.disconnect()
+    
+    def run_with_gui(self):
+        """Run the client with GUI (for menu integration)"""
+        try:
+            # Connect to server
+            if not self.connect():
+                # Connection failed - error dialog will be shown by main.py
+                return False
+            
+            # Initialize game loop with existing screen
+            self.game_loop = GameLoop()
+            self.game_loop.is_client = True
+            self.game_loop.game_state = config.STATE_CONNECTING
+            
+            # Start network thread
+            network_thread = threading.Thread(target=self.network_loop, daemon=True)
+            network_thread.start()
+            
+            # Start input thread  
+            input_thread = threading.Thread(target=self.input_loop, daemon=True)
+            input_thread.start()
+            
+            # Run game loop in main thread (with GUI)
+            self.game_loop.main_loop()
+            
+            return True
+            
+        except KeyboardInterrupt:
+            print("\n🛑 Client interrupted by user")
+            return False
+        except Exception as e:
+            error_msg = f"❌ Client error: {str(e)}"
+            print(error_msg)
+            self.show_error_dialog("Client Error", error_msg)
+            return False
+        finally:
+            self.disconnect()
