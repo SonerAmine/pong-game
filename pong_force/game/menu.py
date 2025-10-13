@@ -17,7 +17,6 @@ class GameMenu:
         self.running = True
         self.selected_option = 0
         self.menu_options = [
-            "Play with Friend (Same PC)",
             "Play vs Robot",
             "Play Online Multiplayer"
         ]

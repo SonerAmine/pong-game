@@ -68,18 +68,7 @@ def main():
                 choice = menu.run()
                 
                 # Handle menu choice
-                if choice == 0:  # Play with Friend (Same PC)
-                    try:
-                        print("🎮 Starting local multiplayer...")
-                        game = GameLoop()
-                        game.run_local()
-                    except Exception as e:
-                        print(f"❌ Error in local multiplayer: {e}")
-                        if config.DEBUG_MODE:
-                            traceback.print_exc()
-                        input("Press Enter to exit...")
-                    
-                elif choice == 1:  # Play vs Robot
+                if choice == 0:  # Play vs Robot
                     try:
                         print("🤖 Starting vs AI...")
                         game = GameLoop()
@@ -90,7 +79,7 @@ def main():
                             traceback.print_exc()
                         input("Press Enter to exit...")
                     
-                elif choice == 2:  # Play Online Multiplayer
+                elif choice == 1:  # Play Online Multiplayer
                     try:
                         # Show submenu for Host or Join
                         submenu = OnlineSubmenu()

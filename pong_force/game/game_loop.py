@@ -208,7 +208,7 @@ class GameLoop:
                         1
                     )
         
-        elif key == pygame.K_LSHIFT or key == pygame.K_RSHIFT:
+        elif key == pygame.K_e:
             if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
                 # Player 2 force push (only if not AI)
                 if not self.ai_enabled and self.paddle2.try_force_push(self.ball):
@@ -314,10 +314,15 @@ class GameLoop:
         Args:
             player_id (int): Player who scored
         """
+        # Add score immediately
         self.scoreboard.add_score(player_id)
         self.effects.create_score_effect(player_id)
         
-        # Start non-blocking delay
+        # Reset ball position to center immediately
+        self.ball.x = config.WINDOW_WIDTH // 2 - self.ball.size // 2
+        self.ball.y = config.WINDOW_HEIGHT // 2 - self.ball.size // 2
+        
+        # Start non-blocking delay before ball moves again
         self.score_delay_active = True
         self.score_delay_timer = 0
         
@@ -388,6 +393,10 @@ class GameLoop:
         # Draw UI
         self.scoreboard.draw(surface)
         
+        # Draw quit button (always visible during gameplay)
+        if self.game_state in [config.STATE_PLAYING, config.STATE_PAUSED]:
+            self.draw_quit_button(surface)
+        
         # Draw game state specific UI
         if self.game_state == config.STATE_PAUSED:
             self.draw_pause_screen(surface)
@@ -404,6 +413,44 @@ class GameLoop:
         fps_text = f"FPS: {self.current_fps}"
         fps_surface = font.render(fps_text, True, config.WHITE)
         self.screen.blit(fps_surface, (10, 10))
+    
+    def draw_quit_button(self, surface):
+        """Draw quit to menu button in top-right corner"""
+        # Button dimensions
+        button_width = 120
+        button_height = 35
+        button_x = config.WINDOW_WIDTH - button_width - 10
+        button_y = 10
+        
+        # Draw button background
+        button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+        
+        # Check if mouse is over button
+        mouse_pos = pygame.mouse.get_pos()
+        is_hover = button_rect.collidepoint(mouse_pos)
+        
+        # Button color based on hover
+        if is_hover:
+            button_color = config.NEON_PINK
+            text_color = config.NEON_YELLOW
+        else:
+            button_color = config.DARK_GRAY
+            text_color = config.WHITE
+        
+        # Draw button
+        pygame.draw.rect(surface, button_color, button_rect, border_radius=5)
+        pygame.draw.rect(surface, config.WHITE, button_rect, 2, border_radius=5)
+        
+        # Draw button text
+        font = pygame.font.Font(None, 22)
+        text_surface = font.render("Menu (Q)", True, text_color)
+        text_rect = text_surface.get_rect(center=button_rect.center)
+        surface.blit(text_surface, text_rect)
+        
+        # Handle click
+        mouse_buttons = pygame.mouse.get_pressed()
+        if is_hover and mouse_buttons[0]:  # Left click
+            self.running = False  # Return to menu
     
     def draw_pause_screen(self, surface):
         """Draw pause screen overlay
@@ -429,7 +476,11 @@ class GameLoop:
         instructions = [
             "Press ESC to resume",
             "Press Q to quit to menu",
-            "Press F11 for fullscreen"
+            "Press F11 for fullscreen",
+            "",
+            "Controls:",
+            "P1: Arrows + SPACE",
+            "P2: W/S + E"
         ]
         
         y_offset = config.WINDOW_HEIGHT // 2 + 20
@@ -548,23 +599,23 @@ class GameLoop:
         else:
             self.paddle2.stop_moving()
         
-        # AI force push logic - more strategic
+        # AI force push logic - strategic but not automatic
         if self.ball.vx > 0:  # Ball moving towards AI paddle
             distance_to_ball = abs(self.paddle2.x - self.ball.x)
             
-            # Use force push when:
-            # 1. Ball is close enough
-            # 2. Ball is fast (good opportunity)
-            # 3. Force is ready
+            # Use force push ONLY when:
+            # 1. Ball is very close and fast
+            # 2. Force is ready
+            # 3. Random chance (not every time)
             ball_speed = math.sqrt(self.ball.vx**2 + self.ball.vy**2)
             
-            if (distance_to_ball < 150 and 
-                ball_speed > config.BALL_SPEED * 1.2 and 
+            if (distance_to_ball < 100 and 
+                ball_speed > config.BALL_SPEED * 1.5 and 
                 self.paddle2.force_ready and
                 not self.score_delay_active):
                 
-                # Higher difficulty = more likely to use force push
-                use_force_chance = self.ai_difficulty * 0.5  # Up to 50% chance
+                # Reduce chance significantly - AI shouldn't spam Force Push
+                use_force_chance = self.ai_difficulty * 0.15  # Max 15% chance (was 50%)
                 if random.random() < use_force_chance:
                     if self.paddle2.try_force_push(self.ball):
                         self.effects.create_force_effect(
