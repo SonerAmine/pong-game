@@ -376,7 +376,7 @@ function trackDownload() {
     if (typeof gtag !== 'undefined') {
         gtag('event', 'download', {
             'event_category': 'engagement',
-            'event_label': 'PongForceSetup.exe'
+            'event_label': 'PongForce.exe'
         });
     }
     

@@ -61,14 +61,14 @@
         
         <div class="file-info">
             <h3>File Information:</h3>
-            <p><strong>File:</strong> PongForceSetup.exe</p>
-            <p><strong>Location:</strong> assets/PongForceSetup.exe</p>
+            <p><strong>File:</strong> PongForce.exe</p>
+            <p><strong>Location:</strong> assets/PongForce.exe</p>
             <p><strong>Expected Size:</strong> ~16.7 MB</p>
         </div>
         
         <div id="status" class="status"></div>
         
-        <a href="assets/PongForceSetup.exe" class="download-btn" download="PongForce.exe" id="download-link">
+        <a href="assets/PongForce.exe" class="download-btn" download="PongForce.exe" id="download-link">
             Download Pong Force
         </a>
         
@@ -118,7 +118,7 @@
         });
         
         // Check if file exists (basic check)
-        fetch('assets/PongForceSetup.exe', {method: 'HEAD'})
+        fetch('assets/PongForce.exe', {method: 'HEAD'})
             .then(response => {
                 const status = document.getElementById('status');
                 if (response.ok) {

