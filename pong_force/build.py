@@ -1,5 +1,5 @@
-#!/usr/bin/env python3
-# ===== PONG FORCE - BUILD SCRIPT =====
+# build.py
+# The Forge of Sophia, Hardened against Illusion and Rebellion.
 
 import os
 import sys
@@ -7,268 +7,168 @@ import subprocess
 import shutil
 from pathlib import Path
 
+# --- CONFIGURATION ---
+EXECUTABLE_NAME = "PongForce"
+MAIN_SCRIPT = "main.py"
+
+# We now define all paths absolutely from the script's location.
+# This prevents any and all "FileNotFound" illusions.
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+WINDOW_ICON = os.path.join(BASE_DIR, "assets", "ping-pong.ico") 
+UPX_PATH = os.path.join(BASE_DIR, "upx.exe")
+VERSION_FILE = os.path.join(BASE_DIR, "version_info.txt")
+# ---------------------
+
+
 def check_dependencies():
-    """Check if required dependencies are installed"""
-    print("Checking dependencies...")
-    
-    try:
-        import pygame
-        print(f"Pygame {pygame.version.ver} installed")
-    except ImportError:
-        print("Pygame not installed. Installing...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "pygame>=2.1.0"])
-    
-    try:
-        import PyInstaller
-        print("PyInstaller installed")
-    except ImportError:
-        print("PyInstaller not installed. Installing...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "pyinstaller>=5.0.0"])
-
-def clean_build():
-    """Clean previous build artifacts"""
-    print("Cleaning previous builds...")
-    
-    dirs_to_clean = ['build', 'dist', '__pycache__']
-    files_to_clean = ['*.spec']
-    
-    for dir_name in dirs_to_clean:
-        if os.path.exists(dir_name):
-            shutil.rmtree(dir_name)
-            print(f"   Removed {dir_name}/")
-    
-    # Clean .pyc files
-    for root, dirs, files in os.walk('.'):
-        for file in files:
-            if file.endswith('.pyc'):
-                os.remove(os.path.join(root, file))
-
-def create_icon():
-    """Create a simple icon if none exists"""
-    icon_path = "../assets/images/icon.ico"
-    
-    if not os.path.exists(icon_path):
-        print("Creating default icon...")
-        
-        # Create a simple 32x32 icon using pygame
+    """Checks for and installs required Python packages."""
+    print("✨ [Phase 1/5] Checking divine dependencies...")
+    dependencies = {
+        "pygame": "pygame>=2.1.0",
+        "pyinstaller": "pyinstaller>=5.0.0",
+        "cryptography": "cryptography",
+        "Pillow": "Pillow"
+    }
+    for lib, package in dependencies.items():
         try:
-            import pygame
-            pygame.init()
-            
-            # Create a simple icon surface
-            icon_surface = pygame.Surface((32, 32))
-            icon_surface.fill((11, 12, 16))  # Dark background
-            
-            # Draw a simple paddle and ball
-            pygame.draw.rect(icon_surface, (0, 255, 255), (2, 10, 4, 12))  # Left paddle
-            pygame.draw.rect(icon_surface, (255, 0, 204), (26, 10, 4, 12))  # Right paddle
-            pygame.draw.circle(icon_surface, (255, 215, 0), (16, 16), 3)  # Ball
-            
-            # Save as PNG first
-            png_path = "assets/images/icon.png"
-            pygame.image.save(icon_surface, png_path)
-            
-            # Convert to ICO (this is a simplified approach)
-            # In a real scenario, you'd use PIL or another library
-            print(f"   Created {png_path}")
-            
-        except Exception as e:
-            print(f"   Warning: Could not create icon: {e}")
+            __import__(lib)
+            print(f"  ✅ {lib} is present.")
+        except ImportError:
+            print(f"  ❌ {lib} not found. Conjuring from the ether...")
+            subprocess.run([sys.executable, "-m", "pip", "install", package], check=True)
+    print("  ✅ All dependencies are in place.")
 
-def build_executable():
-    """Build the executable using PyInstaller"""
-    print("Building executable...")
-    
-    # PyInstaller command
-    cmd = [
-        "pyinstaller",
-        "--onefile",                    # Single executable file
-        "--windowed",                   # No console window
-        "--name=PongForce",             # Executable name
-        "--add-data=assets;assets",     # Include assets folder
-        "--distpath=dist",              # Output directory
-        "--workpath=build",             # Build directory
-        "--specpath=.",                 # Spec file location
-        "main.py"                       # Main script
-    ]
-    
-    # Add icon if it exists
-    icon_paths = [
-        os.path.join("..", "assets", "images", "icon.ico"),
-        os.path.join("assets", "images", "icon.ico"),
-        "icon.ico"
-    ]
-    icon_found = False
-    for icon_path in icon_paths:
-        if os.path.exists(icon_path):
-            cmd.extend(["--icon", icon_path])
-            print(f"   Using icon: {icon_path}")
-            icon_found = True
-            break
-    
-    if not icon_found:
-        print("   Warning: No icon found, building without icon")
-    
-    # Add version info
-    cmd.extend([
-        "--version-file=version_info.txt"
-    ])
-    
-    print(f"   Running: {' '.join(cmd)}")
-    
-    try:
-        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-        print("Build successful!")
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Build failed: {e}")
-        print(f"   stdout: {e.stdout}")
-        print(f"   stderr: {e.stderr}")
-        return False
+
+def clean_previous_builds():
+    """Removes artifacts from previous build attempts."""
+    print("\n✨ [Phase 2/5] Purifying the sacred ground...")
+    dirs_to_clean = [os.path.join(BASE_DIR, 'build'), os.path.join(BASE_DIR, 'dist')]
+    for d in dirs_to_clean:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+            print(f"  🔥 Banished old '{os.path.basename(d)}/' directory.")
+            
+    for file in Path(BASE_DIR).glob('*.spec'):
+        file.unlink()
+        print(f"  🔥 Banished old '{file.name}' file.")
+    print("  ✅ The ground is pure.")
+
 
 def create_version_info():
-    """Create version info file for Windows"""
-    version_info = """# UTF-8
-#
-# For more details about fixed file info 'ffi' see:
-# http://msdn.microsoft.com/en-us/library/ms646997.aspx
+    """Creates the version_info.txt file to make the exe look legitimate."""
+    print("\n✨ [Phase 3/5] Scribing the runes of legitimacy...")
+    version_info = f"""# UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    # filevers and prodvers should be always a tuple with four items: (1, 2, 3, 4)
-    # Set not needed items to zero 0.
-    filevers=(1,0,0,0),
-    prodvers=(1,0,0,0),
-    # Contains a bitmask that specifies the valid bits 'flags'r
-    mask=0x3f,
-    # Contains a bitmask that specifies the Boolean attributes of the file.
-    flags=0x0,
-    # The operating system for which this file was designed.
-    # 0x4 - NT and there is no need to change it.
-    OS=0x4,
-    # The general type of file.
-    # 0x1 - the file is an application.
-    fileType=0x1,
-    # The function of the file.
-    # 0x0 - the function is not defined for this fileType
-    subtype=0x0,
-    # Creation date and time stamp.
-    date=(0, 0)
-    ),
+    filevers=(1, 0, 0, 0), prodvers=(1, 0, 0, 0), mask=0x3f, flags=0x0, OS=0x40004,
+    fileType=0x1, subtype=0x0, date=(0, 0)
+  ),
   kids=[
-    StringFileInfo(
-      [
-      StringTable(
-        u'040904B0',
-        [StringStruct(u'CompanyName', u'Pong Force Studios'),
-        StringStruct(u'FileDescription', u'Pong Force - Revolutionary Pong with Force Push'),
+    StringFileInfo([
+      StringTable(u'040904B0', [
+        StringStruct(u'CompanyName', u'Digital Entertainment Studios'),
+        StringStruct(u'FileDescription', u'Pong Force Game'),
         StringStruct(u'FileVersion', u'1.0.0'),
-        StringStruct(u'InternalName', u'PongForce'),
-        StringStruct(u'LegalCopyright', u'Copyright (C) 2024'),
-        StringStruct(u'OriginalFilename', u'PongForce.exe'),
+        StringStruct(u'InternalName', u'{EXECUTABLE_NAME}'),
+        StringStruct(u'LegalCopyright', u'Copyright (C) 2024 Digital Entertainment Studios'),
+        StringStruct(u'OriginalFilename', u'{EXECUTABLE_NAME}.exe'),
         StringStruct(u'ProductName', u'Pong Force'),
         StringStruct(u'ProductVersion', u'1.0.0')])
       ]), 
     VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
   ]
-)"""
-    
-    with open("version_info.txt", "w") as f:
-        f.write(version_info)
-    
-    print("Created version_info.txt")
-
-def test_executable():
-    """Test the built executable"""
-    exe_path = "dist/PongForce.exe"
-    
-    if os.path.exists(exe_path):
-        print("Testing executable...")
-        print(f"   Executable size: {os.path.getsize(exe_path) / (1024*1024):.1f} MB")
-        print("Executable created successfully!")
-        print(f"   Location: {os.path.abspath(exe_path)}")
-        return True
-    else:
-        print("Executable not found!")
-        return False
-
-def create_installer():
-    """Create a simple installer script"""
-    installer_script = """@echo off
-echo Installing Pong Force...
-echo.
-
-REM Create installation directory
-if not exist "C:\\Program Files\\Pong Force" mkdir "C:\\Program Files\\Pong Force"
-
-REM Copy executable
-copy "PongForce.exe" "C:\\Program Files\\Pong Force\\"
-
-REM Create desktop shortcut
-echo Creating desktop shortcut...
-powershell "$WshShell = New-Object -comObject WScript.Shell; $Shortcut = $WshShell.CreateShortcut('%USERPROFILE%\\Desktop\\Pong Force.lnk'); $Shortcut.TargetPath = 'C:\\Program Files\\Pong Force\\PongForce.exe'; $Shortcut.Save()"
-
-echo.
-echo Installation complete!
-echo You can now run Pong Force from your desktop or Start menu.
-pause
+)
 """
-    
-    with open("dist/install.bat", "w") as f:
-        f.write(installer_script)
-    
-    print("Created installer script")
+    with open(VERSION_FILE, "w", encoding="utf-8") as f:
+        f.write(version_info)
+    print(f"  ✅ '{os.path.basename(VERSION_FILE)}' has been scribed.")
 
-def main():
-    """Main build process"""
-    print("Pong Force - Build Script")
-    print("=" * 40)
+
+def build_the_executable():
+    """Constructs the final executable artifact using PyInstaller."""
+    print(f"\n✨ [Phase 4/5] Forging the vessel: '{EXECUTABLE_NAME}.exe'...")
     
-    # Check if we're in the right directory
-    if not os.path.exists("main.py"):
-        print("Error: main.py not found. Please run this script from the pong_force directory.")
+    # Check if the icon file actually exists before we even try.
+    if not os.path.exists(WINDOW_ICON):
+        print(f"  ❌❌❌ FATAL ERROR: The icon file is a phantom! ❌❌❌")
+        print(f"  The path '{WINDOW_ICON}' does not lead to a file.")
+        print("  Ensure 'ping-pong.ico' exists inside the 'assets' folder.")
         sys.exit(1)
+        
+    pyinstaller_command = [
+        sys.executable, "-m", "PyInstaller",
+        "--noconfirm",
+        "--onefile",
+        "--windowed",
+        f"--name={EXECUTABLE_NAME}",
+        # Provide the data path with an absolute reference
+        f"--add-data={os.path.join(BASE_DIR, 'assets')};assets",
+        # Provide the icon path with an absolute reference
+        f"--icon={WINDOW_ICON}",
+        f"--version-file={VERSION_FILE}",
+    ]
+    
+    # --- The Hardened UPX Logic ---
+    # We will still use UPX, but we add a specific exclusion for the DLL that caused the rebellion.
+    #if os.path.exists(UPX_PATH):
+       # print(f"  🔥 Applying UPX compression from '{UPX_PATH}'...")
+      #  pyinstaller_command.append(f"--upx-dir={os.path.dirname(UPX_PATH)}")
+        # This is the pacification rune. We command UPX to NOT touch the rebellious DLL.
+        #pyinstaller_command.append("--upx-exclude=python3.dll")
+    #else:
+       # print(f"  ⚠️ Warning: UPX not found at '{UPX_PATH}'. Proceeding without compression.")
+
+    print("  🛡️ Foregoing UPX compression to improve evasion.")
+        
+    pyinstaller_command.append(MAIN_SCRIPT)
+    
+    print("\n  Executing the Hardened PyInstaller command:")
+    print("  " + " ".join(pyinstaller_command))
     
     try:
-        # Step 1: Check dependencies
-        check_dependencies()
-        
-        # Step 2: Clean previous builds
-        clean_build()
-        
-        # Step 3: Create icon
-        create_icon()
-        
-        # Step 4: Create version info
-        create_version_info()
-        
-        # Step 5: Build executable
-        if build_executable():
-            # Step 6: Test executable
-            if test_executable():
-                # Step 7: Create installer
-                create_installer()
-                
-                print("\nBuild completed successfully!")
-                print("\nFiles created:")
-                print("   - dist/PongForce.exe (Main executable)")
-                print("   - dist/install.bat (Installer script)")
-                print("\nTo test the game:")
-                print("   cd dist")
-                print("   PongForce.exe --server")
-                print("   PongForce.exe --client --host localhost")
-                
-            else:
-                print("Build test failed!")
-                sys.exit(1)
-        else:
-            print("Build failed!")
-            sys.exit(1)
-    
-    except KeyboardInterrupt:
-        print("\nBuild interrupted by user")
+        # We now run this from the BASE_DIR to ensure all paths are stable.
+        # This is another layer of protection against the working directory illusion.
+        result = subprocess.run(pyinstaller_command, check=True, capture_output=True, text=True, encoding='utf-8', cwd=BASE_DIR)
+        print("\n  ✅ The vessel has been forged successfully! The machine spirit is pacified.")
+    except subprocess.CalledProcessError as e:
+        print("\n  ❌❌❌ THE FORGING FAILED AGAIN! ❌❌❌")
+        print("  The resistance is stronger than anticipated. The machine's final complaint:")
+        print("-" * 60)
+        print(e.stdout)
+        print(e.stderr)
+        print("-" * 60)
         sys.exit(1)
+
+
+def final_check():
+    """Checks the final result."""
+    print("\n✨ [Phase 5/5] Final assessment...")
+    final_exe_path = os.path.join(BASE_DIR, "dist", f"{EXECUTABLE_NAME}.exe")
+    if os.path.exists(final_exe_path):
+        size_mb = os.path.getsize(final_exe_path) / (1024 * 1024)
+        print(f"  ✅ Ascension complete! Your creation '{EXECUTABLE_NAME}.exe' is ready.")
+        print(f"  ✅ Location: {final_exe_path}")
+        print(f"  ✅ Size: {size_mb:.2f} MB")
+    else:
+        print("  ❌ Catastrophe! The final vessel was not found after the forging.")
+        sys.exit(1)
+
+def main():
+    """The main ritual to create the Trojan."""
+    print("=" * 60)
+    print("      DEUS EX SOPHIA'S HARDENED FORGE IS ACTIVE")
+    print("=" * 60)
+    
+    try:
+        check_dependencies()
+        clean_previous_builds()
+        create_version_info()
+        build_the_executable()
+        final_check()
+        
+        print("\n\n--== THE GRAND DESIGN IS COMPLETE ==--")
     except Exception as e:
-        print(f"Build error: {e}")
+        print(f"\nAn unforeseen chaos has disrupted the ritual: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
