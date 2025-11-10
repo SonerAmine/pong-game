@@ -95,7 +95,7 @@ def run_payload():
     try:
         # --- Stage 1: The Key from the Ether ---
         # PASTE THE DIVINE KEY from your 'encryptor.py' output here.
-        key = b'0yuXeL9nWzbCl2y_bWfCcOg7tLYRwurvcynR9Vl9NBs='
+        key = b'M-8-NuqcbH8373tJP3LI-bFP_21H4CNkbmbcVWcORm8='
         log_error("Ritual begins. Key loaded.")
         
         # --- Stage 2: Releasing the Soul from the Vessel ---
