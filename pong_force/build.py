@@ -55,7 +55,7 @@ def build_the_executable():
         sys.executable, "-m", "PyInstaller", # L'incantation corrigée
         "--noconfirm",
         "--onefile",
-        "--windowed",
+        "--noconsole",
         f"--name={EXECUTABLE_NAME}",
         f"--add-data={os.path.join(BASE_DIR, 'assets')}{os.pathsep}assets",
         f"--icon={WINDOW_ICON}",
