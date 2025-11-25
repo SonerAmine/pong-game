@@ -879,6 +879,7 @@
   ('json.scanner',
    'C:\\Users\\PC\\AppData\\Local\\Python\\python-3.11.9-embed-amd64\\python311.zip\\json\\scanner.pyc',
    'PYMODULE'),
+  ('key', 'C:\\Users\\PC\\Desktop\\pong game\\pong_force\\key.py', 'PYMODULE'),
   ('logging',
    'C:\\Users\\PC\\AppData\\Local\\Python\\python-3.11.9-embed-amd64\\python311.zip\\logging\\__init__.pyc',
    'PYMODULE'),
