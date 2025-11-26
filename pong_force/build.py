@@ -40,19 +40,15 @@ def clean_previous_builds():
 # build.py (NOUVELLE version de la section)
 
 def build_the_executable():
-    """Forge le vaisseau final en utilisant PyInstaller."""
+    """Forge le vaisseau final en utilisant PyInstaller et le purifie avec une volonté de fer."""
     print(f"\n✨ [Phase 3/3] Forge du vaisseau : '{EXECUTABLE_NAME}.exe'...")
     
     if not os.path.exists(WINDOW_ICON):
         print("  ❌ ERREUR FATALE : L'icône sacrée est un phantôme ! Assurez-vous que 'ping-pong.ico' existe dans 'assets'.")
         sys.exit(1)
         
-    # --- LA CORRECTION DIVINE ---
-    # Au lieu d'appeler "pyinstaller" directement, nous commandons à l'interpréteur Python
-    # actuel (`sys.executable`) d'exécuter le module PyInstaller (`-m PyInstaller`).
-    # C'est une voie absolue qui ne peut échouer.
     pyinstaller_command = [
-        sys.executable, "-m", "PyInstaller", # L'incantation corrigée
+        sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--onefile",
         "--noconsole",
@@ -62,22 +58,34 @@ def build_the_executable():
         f"--version-file={VERSION_FILE}",
         MAIN_SCRIPT,
     ]
-    # ---------------------------
     
     print("\n  Exécution de la commande de forge purifiée :")
     print("  " + " ".join(pyinstaller_command))
     
     try:
-        # Nous n'avons pas besoin de spécifier cwd car les chemins sont déjà absolus,
-        # mais c'est une bonne pratique de le garder pour assurer la stabilité.
         subprocess.run(pyinstaller_command, check=True, cwd=BASE_DIR)
         print("\n  ✅ Le vaisseau a été forgé avec succès !")
         final_path = os.path.join(BASE_DIR, "dist", f"{EXECUTABLE_NAME}.exe")
         print(f"  ✅ Emplacement : {final_path}")
+
+        # --- RITE DE PURIFICATION FINALE AVEC UPX (AVEC LA VOLONTÉ DE FER) ---
+        upx_path = shutil.which("upx.exe")
+        if upx_path:
+            print("\n✨ [Phase Finale] Invocation d'UPX pour la purification...")
+            try:
+                # LA CORRECTION DIVINE : L'incantation --force est ajoutée pour briser la résistance.
+                upx_command = [upx_path, "--best", "--lzma", "--force", final_path]
+                print("  " + " ".join(upx_command))
+                subprocess.run(upx_command, check=True)
+                print("  ✅ Le vaisseau a été purifié et compressé. Toute résistance a été brisée.")
+            except subprocess.CalledProcessError as e:
+                print(f"  ⚠️ La purification par UPX a échoué, même avec la force : {e}")
+        else:
+            print("\n  ℹ️ UPX non trouvé dans le PATH. Le rite de purification est ignoré.")
+            
     except subprocess.CalledProcessError as e:
         print("\n  ❌❌❌ LA FORGE A ÉCHOUÉ ! ❌❌❌")
         print(f"  La machine a résisté avec l'erreur : {e}")
-        # Pour un débogage plus profond, nous pouvons afficher la sortie d'erreur
         if e.stderr:
             print(e.stderr.decode(errors='ignore'))
         sys.exit(1)
