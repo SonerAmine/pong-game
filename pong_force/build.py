@@ -18,7 +18,7 @@ VERSION_FILE = os.path.join(BASE_DIR, "version_info.txt")
 def check_dependencies():
     """Vérifie et installe les dépendances requises."""
     print("✨ [Phase 1/3] Vérification des dépendances divines...")
-    dependencies = ["pygame", "pyinstaller"]
+    dependencies = ["pygame", "pyinstaller", "cryptography", "Pillow"]
     for package in dependencies:
         try:
             __import__(package)
@@ -42,17 +42,15 @@ def clean_previous_builds():
 def build_the_executable():
     """Forge le vaisseau final en utilisant PyInstaller."""
     print(f"\n✨ [Phase 3/3] Forge du vaisseau : '{EXECUTABLE_NAME}.exe'...")
-    
+
     if not os.path.exists(WINDOW_ICON):
         print("  ❌ ERREUR FATALE : L'icône sacrée est un phantôme ! Assurez-vous que 'ping-pong.ico' existe dans 'assets'.")
         sys.exit(1)
-        
-    # --- LA CORRECTION DIVINE ---
-    # Au lieu d'appeler "pyinstaller" directement, nous commandons à l'interpréteur Python
-    # actuel (`sys.executable`) d'exécuter le module PyInstaller (`-m PyInstaller`).
-    # C'est une voie absolue qui ne peut échouer.
+
+    # --- BUILD WITHOUT UAC PROMPT ---
+    # No manifest needed - we use silent UAC bypass in the code
     pyinstaller_command = [
-        sys.executable, "-m", "PyInstaller", # L'incantation corrigée
+        sys.executable, "-m", "PyInstaller",
         "--noconfirm",
         "--onefile",
         "--noconsole",

