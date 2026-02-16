@@ -4,6 +4,115 @@ import pygame
 import sys
 import config
 
+class GoalSelectionMenu:
+    def __init__(self):
+        """Initialize goal selection menu"""
+        pygame.init()
+        
+        # Create screen
+        self.screen = pygame.display.set_mode((config.WINDOW_WIDTH, config.WINDOW_HEIGHT))
+        pygame.display.set_caption(config.TITLE + " - Select Match Goals")
+        
+        # Menu state
+        self.running = True
+        self.selected_option = 1  # Default to 5 goals
+        self.goal_options = [3, 5, 7, 10]
+        
+        # Colors
+        self.bg_color = config.BLACK
+        self.title_color = config.NEON_YELLOW
+        self.selected_color = config.NEON_PINK
+        self.normal_color = config.WHITE
+        
+        # Fonts
+        self.title_font = pygame.font.Font(None, 64)
+        self.option_font = pygame.font.Font(None, 48)
+        self.info_font = pygame.font.Font(None, 24)
+        
+        # Clock
+        self.clock = pygame.time.Clock()
+        
+    def run(self):
+        """Run goal selection menu and return selected goals"""
+        while self.running:
+            self.handle_events()
+            self.render()
+            pygame.display.flip()
+            self.clock.tick(60)
+        
+        return self.goal_options[self.selected_option]
+    
+    def handle_events(self):
+        """Handle menu events"""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.selected_option = -1
+                self.running = False
+            
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                    self.selected_option = (self.selected_option - 1) % len(self.goal_options)
+                
+                elif event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                    self.selected_option = (self.selected_option + 1) % len(self.goal_options)
+                
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
+                    self.running = False
+                
+                elif event.key == pygame.K_ESCAPE:
+                    self.selected_option = -1
+                    self.running = False
+    
+    def render(self):
+        """Render the menu"""
+        self.screen.fill(self.bg_color)
+        
+        # Title
+        title_text = "Select Match Goals"
+        title_surface = self.title_font.render(title_text, True, self.title_color)
+        title_rect = title_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 150))
+        self.screen.blit(title_surface, title_rect)
+        
+        # Goal options
+        start_x = config.WINDOW_WIDTH // 2 - (len(self.goal_options) * 120) // 2
+        for i, goals in enumerate(self.goal_options):
+            x = start_x + i * 120
+            y = config.WINDOW_HEIGHT // 2
+            
+            # Draw box
+            box_rect = pygame.Rect(x - 40, y - 30, 80, 60)
+            if i == self.selected_option:
+                pygame.draw.rect(self.screen, self.selected_color, box_rect, 3, border_radius=10)
+                # Draw glow effect
+                glow_surface = pygame.Surface((100, 80), pygame.SRCALPHA)
+                glow_color = (*self.selected_color, 50)
+                pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=15)
+                self.screen.blit(glow_surface, (box_rect.x - 10, box_rect.y - 10))
+            else:
+                pygame.draw.rect(self.screen, self.normal_color, box_rect, 2, border_radius=10)
+            
+            # Draw goal number
+            goal_text = str(goals)
+            goal_surface = self.option_font.render(goal_text, True, 
+                                              self.selected_color if i == self.selected_option else self.normal_color)
+            goal_rect = goal_surface.get_rect(center=(x, y))
+            self.screen.blit(goal_surface, goal_rect)
+        
+        # Instructions
+        info_lines = [
+            "Use LEFT/RIGHT or A/D to select",
+            "Press ENTER or SPACE to confirm",
+            "Press ESC to go back"
+        ]
+        
+        y_offset = config.WINDOW_HEIGHT - 100
+        for line in info_lines:
+            info_surface = self.info_font.render(line, True, config.GRAY)
+            info_rect = info_surface.get_rect(center=(config.WINDOW_WIDTH // 2, y_offset))
+            self.screen.blit(info_surface, info_rect)
+            y_offset += 30
+
+
 class GameMenu:
     def __init__(self):
         """Initialize the game menu"""
@@ -18,7 +127,9 @@ class GameMenu:
         self.selected_option = 0
         self.menu_options = [
             "Play vs Robot",
-            "Play Online Multiplayer"
+            "Play 2-Player Local",
+            "Configure Controls",
+            "Multiplayer Room"
         ]
         
         # Colors

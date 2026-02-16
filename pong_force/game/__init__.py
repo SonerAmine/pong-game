@@ -6,6 +6,8 @@ from .power import ForcePush
 from .scoreboard import Scoreboard
 from .effects import EffectsManager
 from .game_loop import GameLoop
-from .menu import GameMenu, HostInputDialog, OnlineSubmenu
+from .menu import GameMenu, HostInputDialog, OnlineSubmenu, GoalSelectionMenu
+from .controls import ControlsMenu
+from .multiplayer import RoomCodeMenu
 
-__all__ = ['Paddle', 'Ball', 'ForcePush', 'Scoreboard', 'EffectsManager', 'GameLoop', 'GameMenu', 'HostInputDialog', 'OnlineSubmenu']
+__all__ = ['Paddle', 'Ball', 'ForcePush', 'Scoreboard', 'EffectsManager', 'GameLoop', 'GameMenu', 'HostInputDialog', 'OnlineSubmenu', 'GoalSelectionMenu', 'ControlsMenu', 'RoomCodeMenu']

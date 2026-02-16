@@ -15,7 +15,7 @@
 
 <div class="node">
   <a name="main.py"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/main.py" type="text/plain"><tt>main.py</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/main.py" type="text/plain"><tt>main.py</tt></a>
 <span class="moduletype">Script</span>  <div class="import">
 imports:
     <a href="#PIL">PIL</a>
@@ -31,7 +31,6 @@ imports:
  &#8226;   <a href="#config">config</a>
  &#8226;   <a href="#copyreg">copyreg</a>
  &#8226;   <a href="#cryptography.fernet">cryptography.fernet</a>
- &#8226;   <a href="#ctypes">ctypes</a>
  &#8226;   <a href="#encodings">encodings</a>
  &#8226;   <a href="#encodings.aliases">encodings.aliases</a>
  &#8226;   <a href="#encodings.ascii">encodings.ascii</a>
@@ -183,7 +182,6 @@ imports:
  &#8226;   <a href="#re._constants">re._constants</a>
  &#8226;   <a href="#re._parser">re._parser</a>
  &#8226;   <a href="#reprlib">reprlib</a>
- &#8226;   <a href="#socket">socket</a>
  &#8226;   <a href="#sre_compile">sre_compile</a>
  &#8226;   <a href="#sre_constants">sre_constants</a>
  &#8226;   <a href="#sre_parse">sre_parse</a>
@@ -191,7 +189,6 @@ imports:
  &#8226;   <a href="#subprocess">subprocess</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#threading">threading</a>
- &#8226;   <a href="#time">time</a>
  &#8226;   <a href="#traceback">traceback</a>
  &#8226;   <a href="#types">types</a>
  &#8226;   <a href="#warnings">warnings</a>
@@ -5929,7 +5926,7 @@ imported by:
 
 <div class="node">
   <a name="config"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/config.py" type="text/plain"><tt>config</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/config.py" type="text/plain"><tt>config</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#os">os</a>
@@ -5938,9 +5935,11 @@ imports:
   <div class="import">
 imported by:
     <a href="#game.ball">game.ball</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.effects">game.effects</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#game.paddle">game.paddle</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#game.scoreboard">game.scoreboard</a>
@@ -6989,7 +6988,6 @@ imports:
 imported by:
     <a href="#ctypes._endian">ctypes._endian</a>
  &#8226;   <a href="#ctypes.wintypes">ctypes.wintypes</a>
- &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.sharedctypes">multiprocessing.sharedctypes</a>
  &#8226;   <a href="#numpy.core._dtype_ctypes">numpy.core._dtype_ctypes</a>
  &#8226;   <a href="#numpy.core._internal">numpy.core._internal</a>
@@ -11364,13 +11362,15 @@ imported by:
 
 <div class="node">
   <a name="game"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/__init__.py" type="text/plain"><tt>game</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/__init__.py" type="text/plain"><tt>game</tt></a>
 <span class="moduletype">Package</span>  <div class="import">
 imports:
     <a href="#game.ball">game.ball</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.effects">game.effects</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#game.paddle">game.paddle</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#game.scoreboard">game.scoreboard</a>
@@ -11379,9 +11379,11 @@ imports:
   <div class="import">
 imported by:
     <a href="#game.ball">game.ball</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.effects">game.effects</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#game.paddle">game.paddle</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#game.scoreboard">game.scoreboard</a>
@@ -11392,7 +11394,7 @@ imported by:
 
 <div class="node">
   <a name="game.ball"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/ball.py" type="text/plain"><tt>game.ball</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/ball.py" type="text/plain"><tt>game.ball</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11412,8 +11414,29 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="game.controls"></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/controls.py" type="text/plain"><tt>game.controls</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#config">config</a>
+ &#8226;   <a href="#game">game</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#os">os</a>
+ &#8226;   <a href="#pygame">pygame</a>
+ &#8226;   <a href="#sys">sys</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#game">game</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="game.effects"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/effects.py" type="text/plain"><tt>game.effects</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/effects.py" type="text/plain"><tt>game.effects</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11436,7 +11459,7 @@ imported by:
 
 <div class="node">
   <a name="game.game_loop"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/game_loop.py" type="text/plain"><tt>game.game_loop</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/game_loop.py" type="text/plain"><tt>game.game_loop</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11446,7 +11469,9 @@ imports:
  &#8226;   <a href="#game.paddle">game.paddle</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#game.scoreboard">game.scoreboard</a>
+ &#8226;   <a href="#json">json</a>
  &#8226;   <a href="#math">math</a>
+ &#8226;   <a href="#os">os</a>
  &#8226;   <a href="#pygame">pygame</a>
  &#8226;   <a href="#random">random</a>
  &#8226;   <a href="#sys">sys</a>
@@ -11466,7 +11491,7 @@ imported by:
 
 <div class="node">
   <a name="game.menu"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/menu.py" type="text/plain"><tt>game.menu</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/menu.py" type="text/plain"><tt>game.menu</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11487,8 +11512,30 @@ imported by:
 </div>
 
 <div class="node">
+  <a name="game.multiplayer"></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/multiplayer.py" type="text/plain"><tt>game.multiplayer</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#config">config</a>
+ &#8226;   <a href="#game">game</a>
+ &#8226;   <a href="#json">json</a>
+ &#8226;   <a href="#pygame">pygame</a>
+ &#8226;   <a href="#random">random</a>
+ &#8226;   <a href="#string">string</a>
+ &#8226;   <a href="#sys">sys</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#game">game</a>
+
+  </div>
+
+</div>
+
+<div class="node">
   <a name="game.paddle"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/paddle.py" type="text/plain"><tt>game.paddle</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/paddle.py" type="text/plain"><tt>game.paddle</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11508,7 +11555,7 @@ imported by:
 
 <div class="node">
   <a name="game.power"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/power.py" type="text/plain"><tt>game.power</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/power.py" type="text/plain"><tt>game.power</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11529,7 +11576,7 @@ imported by:
 
 <div class="node">
   <a name="game.scoreboard"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/game/scoreboard.py" type="text/plain"><tt>game.scoreboard</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/game/scoreboard.py" type="text/plain"><tt>game.scoreboard</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -11967,7 +12014,6 @@ imports:
  &#8226;   <a href="#importlib">importlib</a>
  &#8226;   <a href="#importlib._bootstrap">importlib._bootstrap</a>
  &#8226;   <a href="#importlib._bootstrap_external">importlib._bootstrap_external</a>
- &#8226;   <a href="#importlib.machinery">importlib.machinery</a>
  &#8226;   <a href="#sys">sys</a>
  &#8226;   <a href="#warnings">warnings</a>
 
@@ -12113,8 +12159,7 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib">importlib</a>
- &#8226;   <a href="#importlib.abc">importlib.abc</a>
+    <a href="#importlib.abc">importlib.abc</a>
  &#8226;   <a href="#inspect">inspect</a>
  &#8226;   <a href="#numpy.compat.py3k">numpy.compat.py3k</a>
  &#8226;   <a href="#packaging.tags">packaging.tags</a>
@@ -13424,7 +13469,10 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#importlib_metadata">importlib_metadata</a>
+    <a href="#game.controls">game.controls</a>
+ &#8226;   <a href="#game.game_loop">game.game_loop</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
+ &#8226;   <a href="#importlib_metadata">importlib_metadata</a>
  &#8226;   <a href="#json.decoder">json.decoder</a>
  &#8226;   <a href="#json.encoder">json.encoder</a>
  &#8226;   <a href="#json.scanner">json.scanner</a>
@@ -14594,7 +14642,7 @@ imported by:
 
 <div class="node">
   <a name="network"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/network/__init__.py" type="text/plain"><tt>network</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/network/__init__.py" type="text/plain"><tt>network</tt></a>
 <span class="moduletype">Package</span>  <div class="import">
 imports:
     <a href="#network.client">network.client</a>
@@ -14612,7 +14660,7 @@ imported by:
 
 <div class="node">
   <a name="network.client"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/network/client.py" type="text/plain"><tt>network.client</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/network/client.py" type="text/plain"><tt>network.client</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -14638,7 +14686,7 @@ imported by:
 
 <div class="node">
   <a name="network.server"></a>
-  <a target="code" href="///C:/Users/PC/Desktop/Projects/pong%20game/pong_force/network/server.py" type="text/plain"><tt>network.server</tt></a>
+  <a target="code" href="///C:/Users/PC/Desktop/pong_project/pong_force/network/server.py" type="text/plain"><tt>network.server</tt></a>
 <span class="moduletype">SourceModule</span>  <div class="import">
 imports:
     <a href="#config">config</a>
@@ -20000,7 +20048,9 @@ imported by:
  &#8226;   <a href="#doctest">doctest</a>
  &#8226;   <a href="#email.utils">email.utils</a>
  &#8226;   <a href="#fnmatch">fnmatch</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.effects">game.effects</a>
+ &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#genericpath">genericpath</a>
  &#8226;   <a href="#getopt">getopt</a>
  &#8226;   <a href="#getpass">getpass</a>
@@ -21351,9 +21401,11 @@ imports:
   <div class="import">
 imported by:
     <a href="#game.ball">game.ball</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.effects">game.effects</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#game.paddle">game.paddle</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#game.scoreboard">game.scoreboard</a>
@@ -22262,6 +22314,7 @@ imported by:
  &#8226;   <a href="#game.effects">game.effects</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#game.power">game.power</a>
  &#8226;   <a href="#secrets">secrets</a>
  &#8226;   <a href="#setuptools._vendor.more_itertools.more">setuptools._vendor.more_itertools.more</a>
@@ -26899,7 +26952,6 @@ imported by:
  &#8226;   <a href="#ftplib">ftplib</a>
  &#8226;   <a href="#http.client">http.client</a>
  &#8226;   <a href="#http.server">http.server</a>
- &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.forkserver">multiprocessing.forkserver</a>
  &#8226;   <a href="#multiprocessing.reduction">multiprocessing.reduction</a>
@@ -27111,6 +27163,7 @@ imported by:
  &#8226;   <a href="#email._encoded_words">email._encoded_words</a>
  &#8226;   <a href="#email._header_value_parser">email._header_value_parser</a>
  &#8226;   <a href="#email.quoprimime">email.quoprimime</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#logging">logging</a>
  &#8226;   <a href="#ntpath">ntpath</a>
  &#8226;   <a href="#nturl2path">nturl2path</a>
@@ -27350,8 +27403,10 @@ imported by:
  &#8226;   <a href="#enum">enum</a>
  &#8226;   <a href="#fractions">fractions</a>
  &#8226;   <a href="#ftplib">ftplib</a>
+ &#8226;   <a href="#game.controls">game.controls</a>
  &#8226;   <a href="#game.game_loop">game.game_loop</a>
  &#8226;   <a href="#game.menu">game.menu</a>
+ &#8226;   <a href="#game.multiplayer">game.multiplayer</a>
  &#8226;   <a href="#getopt">getopt</a>
  &#8226;   <a href="#getpass">getpass</a>
  &#8226;   <a href="#gettext">gettext</a>
@@ -27829,7 +27884,6 @@ imported by:
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#logging">logging</a>
- &#8226;   <a href="#main.py">main.py</a>
  &#8226;   <a href="#multiprocessing.connection">multiprocessing.connection</a>
  &#8226;   <a href="#multiprocessing.managers">multiprocessing.managers</a>
  &#8226;   <a href="#multiprocessing.pool">multiprocessing.pool</a>
