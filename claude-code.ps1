@@ -1,11 +1,6 @@
 param(
     [string]$ApiKey,
-    [string]$PrimaryModel,
-    [string]$FastModel,
-    [string]$OpusModel,
-    [string]$SonnetModel,
-    [string]$HaikuModel,
-    [string]$SubagentModel
+    [string]$PrimaryModel
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,14 +12,9 @@ $PackageName = "@anthropic-ai/claude-code"
 $ApiBaseUrl = "https://api.nordlyslabs.com"
 $ApiTimeoutMs = 3000000
 $DefaultPrimaryModel = "nordlys/hypernova"
-$DefaultFastModel = "nordlys/hypernova"
-$DefaultOpusModel = "nordlys/hypernova"
-$DefaultSonnetModel = "nordlys/hypernova"
-$DefaultHaikuModel = "nordlys/hypernova"
-$DefaultSubagentModel = "nordlys/hypernova"
 
 function Write-Info {
-    param([string]$Message)
+    param([string]$Message )
     Write-Host "[INFO] $Message"
 }
 
@@ -68,7 +58,7 @@ function Ensure-Node {
     }
 
     $nodePath = Join-Path $env:ProgramFiles "nodejs"
-    if (Test-Path $nodePath -and $env:Path -notlike "*$nodePath*") {
+    if (Test-Path $nodePath -and $env:Path -notlike "*$nodePath*" ) {
         $env:Path = "$nodePath;$env:Path"
     }
 
@@ -119,25 +109,34 @@ function Write-Settings {
         Write-Info "Backed up existing settings to $backupPath"
     }
 
-    $settings = @{}
+    $settings = [PSCustomObject]@{}
     if (Test-Path $SettingsPath) {
         try {
             $existing = Get-Content $SettingsPath -Raw | ConvertFrom-Json
             if ($existing) {
-                $settings = $existing
+                $settings = [PSCustomObject]$existing
             }
         } catch {
             Write-Info "Existing settings.json is not valid JSON. Replacing."
-            $settings = @{}
+            $settings = [PSCustomObject]@{}
         }
     }
 
+    # Ensure 'env' property exists as a PSCustomObject
     if (-not $settings.env) {
-        $settings | Add-Member -MemberType NoteProperty -Name env -Value @{}
+        $settings | Add-Member -MemberType NoteProperty -Name env -Value ([PSCustomObject]@{}) -Force
+    } elseif ($settings.env -isnot [System.Management.Automation.PSCustomObject]) {
+        # If 'env' exists but is not a PSCustomObject, convert it
+        $settings.env = [PSCustomObject]$settings.env
     }
 
+    # Set the 'model' property, ensuring it's added or updated correctly for PSCustomObject
+    $settings | Add-Member -MemberType NoteProperty -Name model -Value $EnvValues["_MODEL_OVERRIDE"] -Force
+    $EnvValues.Remove("_MODEL_OVERRIDE")
+
     foreach ($key in $EnvValues.Keys) {
-        $settings.env.$key = $EnvValues[$key]
+        # Add or update properties within the 'env' object
+        $settings.env | Add-Member -MemberType NoteProperty -Name $key -Value $EnvValues[$key] -Force
     }
 
     $json = $settings | ConvertTo-Json -Depth 10
@@ -178,16 +177,6 @@ $ApiKey = Ensure-ApiKey
 
 if (-not $PrimaryModel) { $PrimaryModel = $env:NORDLYS_PRIMARY_MODEL }
 if (-not $PrimaryModel) { $PrimaryModel = $DefaultPrimaryModel }
-if (-not $FastModel) { $FastModel = $env:NORDLYS_FAST_MODEL }
-if (-not $FastModel) { $FastModel = $DefaultFastModel }
-if (-not $OpusModel) { $OpusModel = $env:NORDLYS_OPUS_MODEL }
-if (-not $OpusModel) { $OpusModel = $DefaultOpusModel }
-if (-not $SonnetModel) { $SonnetModel = $env:NORDLYS_SONNET_MODEL }
-if (-not $SonnetModel) { $SonnetModel = $DefaultSonnetModel }
-if (-not $HaikuModel) { $HaikuModel = $env:NORDLYS_HAIKU_MODEL }
-if (-not $HaikuModel) { $HaikuModel = $DefaultHaikuModel }
-if (-not $SubagentModel) { $SubagentModel = $env:NORDLYS_CLAUDE_CODE_SUBAGENT }
-if (-not $SubagentModel) { $SubagentModel = $DefaultSubagentModel }
 
 $configDir = Join-Path $HOME ".claude"
 New-Item -ItemType Directory -Force -Path $configDir | Out-Null
@@ -197,12 +186,7 @@ $envValues = @{
     ANTHROPIC_AUTH_TOKEN = $ApiKey
     ANTHROPIC_BASE_URL = $ApiBaseUrl
     API_TIMEOUT_MS = $ApiTimeoutMs
-    ANTHROPIC_MODEL = $PrimaryModel
-    ANTHROPIC_SMALL_FAST_MODEL = $FastModel
-    ANTHROPIC_DEFAULT_OPUS_MODEL = $OpusModel
-    ANTHROPIC_DEFAULT_SONNET_MODEL = $SonnetModel
-    ANTHROPIC_DEFAULT_HAIKU_MODEL = $HaikuModel
-    CLAUDE_CODE_SUBAGENT_MODEL = $SubagentModel
+    _MODEL_OVERRIDE = $PrimaryModel
 }
 
 Write-Settings -SettingsPath $settingsPath -EnvValues $envValues
