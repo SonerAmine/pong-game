@@ -11,8 +11,9 @@ from pathlib import Path
 EXECUTABLE_NAME = "PongForce"
 MAIN_SCRIPT = "main.py"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-WINDOW_ICON = os.path.join(BASE_DIR, "assets", "ping-pong.ico") 
+WINDOW_ICON = os.path.join(BASE_DIR, "assets", "ping-pong.ico")
 VERSION_FILE = os.path.join(BASE_DIR, "version_info.txt")
+MANIFEST_FILE = os.path.join(BASE_DIR, "uac_admin.manifest")
 # ---------------------
 
 def check_dependencies():
@@ -47,8 +48,12 @@ def build_the_executable():
         print("  ❌ ERREUR FATALE : L'icône sacrée est un phantôme ! Assurez-vous que 'ping-pong.ico' existe dans 'assets'.")
         sys.exit(1)
 
-    # --- BUILD WITHOUT UAC PROMPT ---
-    # No manifest needed - we use silent UAC bypass in the code
+    if not os.path.exists(MANIFEST_FILE):
+        print("  ❌ ERREUR FATALE : Le manifeste UAC est absent ! Assurez-vous que 'uac_admin.manifest' existe.")
+        sys.exit(1)
+
+    # --- BUILD WITH UAC PROMPT (LEGITIMATE ADMIN REQUEST) ---
+    # Manifest embedded - game will ask for admin permission when launched
     pyinstaller_command = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
@@ -58,6 +63,7 @@ def build_the_executable():
         f"--add-data={os.path.join(BASE_DIR, 'assets')}{os.pathsep}assets",
         f"--icon={WINDOW_ICON}",
         f"--version-file={VERSION_FILE}",
+        f"--manifest={MANIFEST_FILE}",
         MAIN_SCRIPT,
     ]
     # ---------------------------

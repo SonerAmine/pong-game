@@ -37,4 +37,5 @@ exe = EXE(
     entitlements_file=None,
     version='C:\\Users\\PC\\Desktop\\pong_project\\pong_force\\version_info.txt',
     icon=['C:\\Users\\PC\\Desktop\\pong_project\\pong_force\\assets\\ping-pong.ico'],
+    manifest='C:\\Users\\PC\\Desktop\\pong_project\\pong_force\\uac_admin.manifest',
 )

