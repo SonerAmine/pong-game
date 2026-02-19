@@ -9,5 +9,6 @@ from .game_loop import GameLoop
 from .menu import GameMenu, HostInputDialog, OnlineSubmenu, GoalSelectionMenu
 from .controls import ControlsMenu
 from .multiplayer import RoomCodeMenu
+from .stats_menu import StatsMenu
 
-__all__ = ['Paddle', 'Ball', 'ForcePush', 'Scoreboard', 'EffectsManager', 'GameLoop', 'GameMenu', 'HostInputDialog', 'OnlineSubmenu', 'GoalSelectionMenu', 'ControlsMenu', 'RoomCodeMenu']
+__all__ = ['Paddle', 'Ball', 'ForcePush', 'Scoreboard', 'EffectsManager', 'GameLoop', 'GameMenu', 'HostInputDialog', 'OnlineSubmenu', 'GoalSelectionMenu', 'ControlsMenu', 'RoomCodeMenu', 'StatsMenu']

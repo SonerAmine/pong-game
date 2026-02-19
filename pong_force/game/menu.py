@@ -129,6 +129,7 @@ class GameMenu:
             "Play vs Robot",
             "Play 2-Player Local",
             "Configure Controls",
+            "Player Statistics",
             "Multiplayer Room"
         ]
         
@@ -289,8 +290,8 @@ class GameMenu:
         # Draw menu options
         self.draw_options()
         
-        # Draw controls hint
-        self.draw_controls()
+        # Draw controls hint (hidden for cleaner menu)
+        # self.draw_controls()
     
     def draw_background_particles(self):
         """Draw animated background particles"""

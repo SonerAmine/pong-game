@@ -14,23 +14,24 @@ WHITE = (255, 255, 255)       # Text
 NEON_BLUE = (0, 255, 255)     # Player 1, UI elements
 NEON_PINK = (255, 0, 204)     # Player 2, Force effects
 NEON_YELLOW = (255, 215, 0)   # Ball, highlights
+NEON_GREEN = (0, 255, 128)     # Success indicators, positive stats
 GRAY = (128, 128, 128)        # Secondary text
 DARK_GRAY = (64, 64, 64)      # Borders
 
 # ===== GAME PHYSICS =====
 PADDLE_SPEED = 24              # Vitesse x3 (était 8)
-BALL_SPEED = 18                # Vitesse x3 (était 6)
+BALL_SPEED = 6                 # Much slower initial speed for better tracking
 BALL_SPEED_INCREASE = 0.3      # Speed increase per hit (augmenté)
 MAX_BALL_SPEED = 45            # Max speed x3 (était 15)
 
 # ===== FORCE PUSH SYSTEM =====
-FORCE_MULTIPLIER = 2.0        # Speed multiplier when force push is used (x2)
-FORCE_COOLDOWN = 30           # Seconds between force pushes (30 secondes)
-FORCE_METER_FILL_RATE = 1.0   # How fast the meter fills (per second)
+FORCE_MULTIPLIER = 2.5        # Speed multiplier when force push is used (2.5x for significant increase)
+FORCE_COOLDOWN = 75           # 75 seconds to charge force push bar
+FORCE_METER_FILL_RATE = 1/75   # How fast meter fills (full in 75 seconds)
 FORCE_STUN_DURATION = 0.5     # Seconds of stun if force push fails
 FORCE_EFFECT_DURATION = 1.0   # How long the force effect lasts
-FORCE_DASH_DISTANCE = 80      # Distance the paddle moves when using force
-FORCE_DASH_DURATION = 0.3     # Duration of the dash movement
+FORCE_DASH_DISTANCE = 80      # Distance paddle moves when using force
+FORCE_DASH_DURATION = 0.3     # Duration of dash movement
 
 # ===== PADDLE SETTINGS =====
 PADDLE_WIDTH = 15
@@ -87,15 +88,20 @@ STATE_PAUSED = "paused"
 STATE_GAME_OVER = "game_over"
 
 # ===== INPUT KEYS =====
-# Player 1 controls
+# Player 1 controls (vs Robot and 2-Player)
 P1_UP = "up"
 P1_DOWN = "down"
 P1_FORCE = "space"
 
-# Player 2 controls
-P2_UP = "w"
-P2_DOWN = "s"
-P2_FORCE = "shift"
+# Player 2 controls (vs Robot)
+P2_ROBOT_UP = "w"
+P2_ROBOT_DOWN = "s"
+P2_ROBOT_FORCE = "shift"
+
+# Player 2 controls (2-Player Local)
+P2_LOCAL_UP = "z"
+P2_LOCAL_DOWN = "s"
+P2_LOCAL_FORCE = "a"
 
 # General controls
 PAUSE_KEY = "escape"

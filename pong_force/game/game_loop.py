@@ -18,6 +18,8 @@ from .scoreboard import Scoreboard
 
 from .effects import EffectsManager
 
+from .player_history import PlayerHistory
+
 import config
 
 
@@ -211,6 +213,11 @@ class GameLoop:
         self.score_delay_timer = 0
 
         self.score_delay_duration = 1.5  # seconds
+
+        
+
+        # Player history system
+        self.player_history = PlayerHistory()
 
         
 
@@ -897,6 +904,58 @@ class GameLoop:
             self.scoreboard.game_over = True
 
             self.game_state = config.STATE_GAME_OVER
+
+            
+
+            # Record game results in player history
+            self.record_game_result()
+
+    
+
+    def record_game_result(self):
+        """Record the game result in player history"""
+        # Determine game mode
+        if self.ai_enabled:
+            mode = "vs_robot"
+        elif self.two_player_local:
+            mode = "two_player_local"
+        else:
+            mode = "multiplayer"
+        
+        # Determine winner and record results
+        if self.scoreboard.player1_score >= self.custom_win_score:
+            # Player 1 won
+            self.player_history.record_game(
+                1, mode, True, 
+                self.scoreboard.player1_score, 
+                self.scoreboard.player2_score
+            )
+            
+            # Player 2 lost (only in 2-player local mode)
+            if self.two_player_local:
+                self.player_history.record_game(
+                    2, mode, False,
+                    self.scoreboard.player2_score,
+                    self.scoreboard.player1_score
+                )
+                
+        elif self.scoreboard.player2_score >= self.custom_win_score:
+            # Player 2 won (only record if in 2-player local mode)
+            if self.two_player_local:
+                self.player_history.record_game(
+                    2, mode, True,
+                    self.scoreboard.player2_score,
+                    self.scoreboard.player1_score
+                )
+            
+            # Player 1 lost
+            self.player_history.record_game(
+                1, mode, False,
+                self.scoreboard.player1_score,
+                self.scoreboard.player2_score
+            )
+        
+        print(f"📈 Game result recorded for mode: {mode}")
 
     
 

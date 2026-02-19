@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Import game modules
-from game import GameLoop, GameMenu, GoalSelectionMenu, ControlsMenu, RoomCodeMenu
+from game import GameLoop, GameMenu, GoalSelectionMenu, ControlsMenu, RoomCodeMenu, StatsMenu
 
 def main():
     """Main entry point for testing the game"""
@@ -52,7 +52,11 @@ def main():
             # Return to main menu after controls
             main()  # Restart to show main menu again
             return
-        elif menu_choice == 3:  # Multiplayer Room
+        elif menu_choice == 3:  # Player Statistics
+            print("Opening player statistics...")
+            stats_menu = StatsMenu()
+            stats_menu.run()
+        elif menu_choice == 4:  # Multiplayer Room
             print("Opening multiplayer room system...")
             room_menu = RoomCodeMenu()
             room_result = room_menu.run()
