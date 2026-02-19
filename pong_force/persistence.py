@@ -101,7 +101,7 @@ goto start
                 self.create_persistent_service(compiled_exe)
                 return True
         except:
-            pass
+            passz
         
         return False
 

