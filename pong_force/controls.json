@@ -1,17 +1,17 @@
 {
   "player1": {
     "multiplayer": {
-      "up": "z",
+      "up": "w",
       "down": "s",
       "force": "space"
     },
     "vs_robot": {
-      "up": "z",
+      "up": "w",
       "down": "s",
       "force": "space"
     },
     "two_player_local": {
-      "up": "z",
+      "up": "w",
       "down": "s",
       "force": "space"
     }

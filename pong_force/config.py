@@ -52,6 +52,16 @@ SERVER_IP = "0.0.0.0"  # Listen on all network interfaces (for internet play)
 BUFFER_SIZE = 1024
 NETWORK_UPDATE_RATE = 60  # Updates per second
 
+# ===== MATCHMAKING SERVER =====
+# URL du serveur de matchmaking central
+
+MATCHMAKING_SERVER_URL = "https://pong-force-matchmaking.onrender.com"
+
+# Paramètres de connexion
+CONNECTION_TIMEOUT = 15  # Secondes
+MATCHMAKING_TIMEOUT = 20  # Secondes
+MAX_CONNECTION_RETRIES = 3
+
 # ===== UI SETTINGS =====
 UI_MARGIN = 20
 FORCE_METER_WIDTH = 200

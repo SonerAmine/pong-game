@@ -347,7 +347,7 @@ class GameLoop:
 
         """Run 2-player local game with custom win score"""
 
-        print(f"👥 Starting 2-player local game - First to {win_score} wins!")
+        print(f"Starting 2-player local game - First to {win_score} wins!")
 
         self.two_player_local = True
 
@@ -417,7 +417,17 @@ class GameLoop:
 
             self.update(dt)
 
-            
+            # Broadcast game state to clients if server (at network update rate)
+            if self.is_server and hasattr(self, 'server'):
+                # Broadcast at network update rate (60 times per second)
+                if not hasattr(self, '_last_broadcast_time'):
+                    self._last_broadcast_time = current_time
+                    self._broadcast_interval = 1.0 / config.NETWORK_UPDATE_RATE
+                
+                if current_time - self._last_broadcast_time >= self._broadcast_interval:
+                    self.server.broadcast_game_state()
+                    # Note: relay inputs are polled in a separate thread (relay_polling_loop)
+                    self._last_broadcast_time = current_time
 
             # Render
 
@@ -653,29 +663,45 @@ class GameLoop:
 
         
 
-        # Update input
+        # Update input (only for host/server, not for client)
+        # Client receives game state from server, so it doesn't process input locally
 
-        if not self.score_delay_active:
+        if not self.score_delay_active and not self.is_client:
 
             self.update_input()
 
         
 
         # Update game objects
+        # Client receives state from server, so it doesn't simulate gameplay
+        # Only server/host simulates the game
 
-        if self.game_state == config.STATE_PLAYING and not self.score_delay_active:
+        if self.game_state == config.STATE_PLAYING and not self.score_delay_active and not self.is_client:
 
             self.update_gameplay(dt)
 
         
 
-        # Update effects
+        # Update effects (always update, even for client)
 
         self.effects.update(dt)
 
         self.force_push.update(dt)
 
         
+
+        # Update paddles visually (for effects like glow, trail) even if client
+        # Position comes from server, but visual effects need updating
+        if self.game_state == config.STATE_PLAYING and self.is_client:
+            # Client: only update visual effects, not movement (position comes from server)
+            # Update visual effects without modifying position
+            self.paddle1.update_visual_effects(dt)
+            self.paddle2.update_visual_effects(dt)
+            # Update collision rectangles for rendering
+            self.paddle1.rect.x = self.paddle1.x
+            self.paddle1.rect.y = self.paddle1.y
+            self.paddle2.rect.x = self.paddle2.x
+            self.paddle2.rect.y = self.paddle2.y
 
         # Update scoreboard
 
@@ -697,7 +723,7 @@ class GameLoop:
 
         """Update input handling with custom controls"""
 
-        # Player 1 controls (customizable)
+        # Player 1 controls (customizable) - Host controls paddle1
 
         p1_up_key = self.get_control_key(1, "up")
 
@@ -723,7 +749,15 @@ class GameLoop:
 
         # Player 2 controls (depends on mode)
 
-        if self.ai_enabled:
+        if self.is_server:
+
+            # In server mode, player 2 is controlled by client via network
+
+            # Don't process keyboard input for paddle2 - it's controlled by network
+
+            pass
+
+        elif self.ai_enabled:
 
             # AI controls player 2
 
@@ -731,7 +765,7 @@ class GameLoop:
 
         else:
 
-            # Human player 2 controls (customizable)
+            # Human player 2 controls (customizable) - for local 2-player or client mode
 
             p2_up_key = self.get_control_key(2, "up")
 
@@ -1354,137 +1388,44 @@ class GameLoop:
     
 
     def draw_waiting_screen(self, surface):
-
         """Draw waiting for players screen with animation
 
-        
-
         Args:
-
             surface (pygame.Surface): Surface to draw on
-
         """
-
         import math
 
-        
-
         # Animated title
-
         font = pygame.font.Font(None, 48)
-
-        wait_text = "Waiting for Players..."
-
-        
+        wait_text = "Waiting for Players"
 
         # Pulsing effect
-
         pulse = 0.8 + 0.2 * math.sin(time.time() * 3)
-
         color = (
-
             int(config.NEON_BLUE[0] * pulse),
-
             int(config.NEON_BLUE[1] * pulse),
-
             int(config.NEON_BLUE[2] * pulse)
-
         )
-
-        
 
         wait_surface = font.render(wait_text, True, color)
-
-        wait_rect = wait_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 60))
-
+        wait_rect = wait_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT // 2 - 40))
         surface.blit(wait_surface, wait_rect)
 
-        
-
         # Animated dots
-
         dots_count = int((time.time() * 2) % 4)
-
         dots_text = "." * dots_count
-
         dots_surface = font.render(dots_text, True, color)
-
         dots_rect = dots_surface.get_rect(
-
             topleft=(wait_rect.right + 5, wait_rect.top)
-
         )
-
         surface.blit(dots_surface, dots_rect)
 
-        
-
-        # Server info box
-
-        font_medium = pygame.font.Font(None, 28)
-
-        font_small = pygame.font.Font(None, 24)
-
-        
-
-        info_lines = [
-
-            "🌐 Server Information:",
-
-            f"Port: {config.SERVER_PORT}",
-
-            "",
-
-            "📋 Instructions:",
-
-            "1. Share your PUBLIC IP with other players",
-
-            "2. Find your IP at: www.whatismyip.com",
-
-            "3. Other player should select 'Join Game'",
-
-            "   and enter your IP address",
-
-            "",
-
-            "⏳ Waiting for opponent to connect..."
-
-        ]
-
-        
-
-        y_offset = config.WINDOW_HEIGHT // 2 + 20
-
-        for i, line in enumerate(info_lines):
-
-            if i == 0 or i == 3:  # Headers
-
-                text_surface = font_medium.render(line, True, config.NEON_YELLOW)
-
-            else:
-
-                text_surface = font_small.render(line, True, config.WHITE)
-
-            
-
-            text_rect = text_surface.get_rect(center=(config.WINDOW_WIDTH // 2, y_offset))
-
-            surface.blit(text_surface, text_rect)
-
-            y_offset += 30 if i == 0 or i == 3 else 25
-
-        
-
         # Press ESC to cancel hint
-
+        font_small = pygame.font.Font(None, 24)
         hint_surface = font_small.render("Press ESC or Q to return to menu", True, config.GRAY)
-
         hint_rect = hint_surface.get_rect(
-
             center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - 30)
-
         )
-
         surface.blit(hint_surface, hint_rect)
 
     

@@ -105,12 +105,25 @@ class ControlsMenu:
         self.save_controls()
         return True
     
+    def get_option_rect(self, index):
+        """Get the clickable rectangle for a main menu option"""
+        start_y = 180
+        option_y = start_y + index * 50
+        box_width = 500
+        box_height = 45
+        return pygame.Rect(
+            config.WINDOW_WIDTH // 2 - box_width // 2,
+            option_y - box_height // 2,
+            box_width,
+            box_height
+        )
+
     def handle_events(self):
         """Handle menu events"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            
+
             elif event.type == pygame.KEYDOWN:
                 if self.editing_player is None:
                     # Main menu navigation
@@ -138,9 +151,36 @@ class ControlsMenu:
                     else:
                         # Handle key assignment
                         self.handle_key_edit(event)
-            
+
+            elif event.type == pygame.MOUSEMOTION:
+                # Check if mouse is over any option in main menu
+                if self.editing_player is None:
+                    mouse_pos = event.pos
+                    for i in range(4):
+                        if self.get_option_rect(i).collidepoint(mouse_pos):
+                            self.selected_option = i
+                            break
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                self.handle_mouse_click(event)
+                if self.editing_player is None:
+                    # Main menu mouse click
+                    mouse_pos = event.pos
+                    for i in range(4):
+                        if self.get_option_rect(i).collidepoint(mouse_pos):
+                            self.selected_option = i
+                            # Execute the action
+                            if self.selected_option == 0:  # Player 1 controls
+                                self.editing_player = 1
+                            elif self.selected_option == 1:  # Player 2 controls
+                                self.editing_player = 2
+                            elif self.selected_option == 2:  # Reset to defaults
+                                self.reset_to_defaults()
+                            elif self.selected_option == 3:  # Back
+                                self.running = False
+                            break
+                else:
+                    # Editing mode mouse click
+                    self.handle_mouse_click(event)
     
     def handle_key_edit(self, event):
         """Handle key editing for player"""
@@ -305,21 +345,47 @@ class ControlsMenu:
         title_surface = self.title_font.render(title_text, True, self.title_color)
         title_rect = title_surface.get_rect(center=(config.WINDOW_WIDTH // 2, 80))
         self.screen.blit(title_surface, title_rect)
-        
+
         # Menu options
         options = [
             "Configure Player 1 Controls",
-            "Configure Player 2 Controls", 
+            "Configure Player 2 Controls",
             "Reset to Defaults",
             "Back to Main Menu"
         ]
-        
+
         start_y = 180
         for i, option in enumerate(options):
-            color = self.selected_color if i == self.selected_option else self.normal_color
+            option_rect = self.get_option_rect(i)
+
+            if i == self.selected_option:
+                # Draw selection box with glow effect
+                glow_surface = pygame.Surface((option_rect.width + 12, option_rect.height + 12), pygame.SRCALPHA)
+                glow_color = (*self.selected_color, 60)
+                pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=10)
+                self.screen.blit(glow_surface, (option_rect.x - 6, option_rect.y - 6))
+
+                # Draw selection border
+                pygame.draw.rect(self.screen, self.selected_color, option_rect, 2, border_radius=8)
+
+                # Draw indicator circle
+                pygame.draw.circle(self.screen, self.selected_color,
+                                 (option_rect.left - 15, option_rect.centery), 6)
+                color = self.selected_color
+            else:
+                # Draw subtle border for non-selected items
+                pygame.draw.rect(self.screen, (50, 50, 50), option_rect, 1, border_radius=8)
+                color = self.normal_color
+
             option_surface = self.option_font.render(option, True, color)
-            option_rect = option_surface.get_rect(center=(config.WINDOW_WIDTH // 2, start_y + i * 50))
-            self.screen.blit(option_surface, option_rect)
+            option_text_rect = option_surface.get_rect(center=option_rect.center)
+            self.screen.blit(option_surface, option_text_rect)
+
+        # Instructions
+        hint_text = "Arrow Keys / Mouse to navigate  |  ENTER / Click to select  |  ESC to go back"
+        hint_surface = pygame.font.Font(None, 22).render(hint_text, True, config.GRAY)
+        hint_rect = hint_surface.get_rect(center=(config.WINDOW_WIDTH // 2, config.WINDOW_HEIGHT - 40))
+        self.screen.blit(hint_surface, hint_rect)
     
     def render_edit_menu(self):
         """Render control editing menu"""
